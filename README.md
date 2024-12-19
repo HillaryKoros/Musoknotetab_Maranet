@@ -1,6 +1,6 @@
 # Flood Impact Maps
 
-This project focuses on developing a full-stack solution for visualizing flood impact data. The architecture integrates automated data fetching, a backend API, and a React frontend for interactive visualization. The development environment uses Docker, VS Code, and Ubuntu WSL 1.
+This project focuses on developing a full-stack solution for visualizing flood impact data and Hazard Maps. The architecture integrates automated data fetching, a backend API, and a React frontend for interactive visualization. The development environment uses Docker, VS Code.
 
 ## Table of Contents
 - [Project Structure](#project-structure)
@@ -11,32 +11,20 @@ This project focuses on developing a full-stack solution for visualizing flood i
 
 ## Project Structure
 ```plaintext
-flood-impact-maps/
-├── backend/           # Wagtail backend
-│   ├── Dockerfile
-│   ├── manage.py
-│   ├── flood_backend/
-├── frontend/          # React frontend
-│   ├── Dockerfile
-│   ├── package.json
-│   ├── src/
-├── scripts/           # Python scripts for fetching data
-│   ├── fetch_data.py
-├── docker-config/     # Docker configuration
-├── docker-compose.yml # Docker Compose file
+
 ```
 
 ## Setup Instructions
 
 ### Prerequisites
 - **VS Code**
-- **Ubuntu WSL 1** (Windows Subsystem for Linux)
-- **Docker Desktop for Windows** (with WSL 2 backend enabled)
+- **Windows System** 
+- **Docker Desktop for Windows**
 
 ### Clone the Repository
 ```bash
 git clone <repository_url>
-cd flood-impact-maps
+cd flood-watch-system
 ```
 
 ### Initialize Docker Compose

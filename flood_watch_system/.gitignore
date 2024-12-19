@@ -1,0 +1,23 @@
+# Ignore database files
+*.sqlite3
+
+# Ignore environment variables
+.env
+
+# Ignore compiled files
+*.pyc
+__pycache__/
+
+# Ignore Django migrations
+*/migrations/*
+
+# Ignore media files
+media/
+
+# Ignore IDE specific files
+.vscode/
+.idea/
+
+# Ignore system files
+.DS_Store
+Thumbs.db

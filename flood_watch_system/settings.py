@@ -15,8 +15,15 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# GDAL and GEOS library paths
 GDAL_LIBRARY_PATH = r'C:\OSGeo4W\bin\gdal309.dll'
 GEOS_LIBRARY_PATH = r'C:\OSGeo4W\bin\geos_c.dll'
+
+# Set environment variables for GDAL and PROJ
+os.environ['GDAL_DATA'] = r'C:\OSGeo4W\share\gdal'
+os.environ['PROJ_LIB'] = r'C:\OSGeo4W\share\proj'
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
@@ -38,6 +45,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.gis',
+    'leaflet',
     'Impact'
 ]
 
@@ -79,8 +88,8 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
         'NAME': 'flood_watch_system', 
-        'USER': '',
-        'PASSWORD': '',
+        'USER': 'postgres',
+        'PASSWORD': 'Icpac2025',
         'HOST': 'localhost',
         'PORT': '5432',
     }

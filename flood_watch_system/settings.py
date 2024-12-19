@@ -132,6 +132,16 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+
+# Leaflet settings
+LEAFLET_CONFIG = {
+    'DEFAULT_CENTER': (-1.286389, 36.817223),
+    'DEFAULT_ZOOM': 3,
+    'MIN_ZOOM': 3,
+    'MAX_ZOOM': 18,
+    'SCALE': 'both',
+    'ATTRIBUTION_PREFIX': 'IGAD-ICPAC'
+}
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 

@@ -79,8 +79,8 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
         'NAME': 'flood_watch_system', 
-        'USER': 'postgres',
-        'PASSWORD': 'Icpac2025',
+        'USER': '',
+        'PASSWORD': '',
         'HOST': 'localhost',
         'PORT': '5432',
     }

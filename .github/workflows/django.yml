@@ -1,0 +1,65 @@
+name: Django CI/CD with Conda and pip (Staging)
+
+on:
+  push:
+    branches:
+      - main  
+  pull_request:
+    branches:
+      - main  # Trigger on PRs to main branch
+
+jobs:
+  setup-conda:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code from GitHub
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Step 2: Set up Miniconda environment using environment.yml
+      - name: Set up Conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          miniconda-version: 'latest'
+          activate-environment: 'mydjangoenv'  # You can replace with your environment name
+          environment-file: environment.yml  # Path to the Conda environment file
+
+      # Step 3: Install additional pip dependencies from requirements.txt
+      - name: Install pip dependencies from requirements.txt
+        run: |
+          pip install -r requirements.txt  # Install dependencies from requirements.txt
+
+      # Step 4: Set up the database (PostgreSQL, or any database required for staging)
+      - name: Set up the database (PostgreSQL example)
+        run: |
+          sudo apt-get install postgresql
+          sudo service postgresql start
+
+      # Step 5: Run Django tests
+      - name: Run Django tests
+        run: |
+          python manage.py test  # Run tests to validate functionality
+
+      # Step 6: Apply database migrations
+      - name: Apply database migrations
+        run: |
+          python manage.py migrate  # Apply any pending migrations
+
+      # Step 7: Collect static files (optional for staging)
+      - name: Collect static files
+        run: |
+          python manage.py collectstatic --noinput  # This step is optional for staging
+
+      # Optional: You can add linting or code quality checks here
+      - name: Lint code with flake8
+        run: |
+          pip install flake8
+          flake8 .  # Lint code to ensure quality
+
+      # Step 8: Deploy to staging (Optional - adjust this step as needed)
+      # If you don't have a staging deployment, you can skip this step
+      - name: Deploy to Staging (optional)
+        run: |
+          echo "Deploying to staging environment"  # Add your staging deployment script/commands here
+

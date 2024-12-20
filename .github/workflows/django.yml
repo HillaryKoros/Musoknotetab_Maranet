@@ -12,31 +12,18 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [ "3.x" ]  # This will use the latest available Python version in the 3.x range
+        python-version: [3.9.20]  # Using Python 3.9.20 as requested
 
     steps:
     - uses: actions/checkout@v4
-    
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
-
-    - name: Set up Conda
-      uses: conda-incubator/setup-miniconda@v2
-      with:
-        python-version: ${{ matrix.python-version }}  # Ensure Conda uses the same Python version
-        auto-activate-base: false  # Prevent auto activation of the base environment
-
-    - name: Create Conda environment from environment.yml
+    - name: Set up Conda environment
       run: |
         conda env create -f environment.yml
-        conda activate flood_watch_env  # Use your environment name defined in environment.yml
-
-    - name: Install dependencies via pip
-      run: |
-        pip install -r requirements.txt  # Ensure pip dependencies are installed
-
+        conda activate your-environment-name
     - name: Run Tests
       run: |
         python manage.py test

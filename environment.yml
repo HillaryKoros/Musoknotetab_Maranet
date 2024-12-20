@@ -1,28 +1,20 @@
-name: mydjangoenv  # Name of the environment
+name: mydjangoenv
 channels:
   - conda-forge
   - defaults
 dependencies:
   - python=3.9
-  - pip  # Ensure pip is available
-  - gdal=3.10.0
-  - geopandas
-  - geos
-  - libpq
-  - psycopg2
+  - pip
+  - gdal=3.10.0  # Removed specific build
+  - geopandas  # Conda can resolve the appropriate version
+  - geos=3.13.0
+  - libpq  # Version omitted to let Conda resolve compatibility
+  - psycopg2  # Same as above
   - libcurl
   - libxml2
   - pyproj
   - sqlite
-  - tzdata
-  - typing_extensions
-  - zlib
-  - zstd
-  - tbb
-  - x265
-  - svt-av1
   - shapely
-  - numpy
   - pandas
   - flask
   - pip:

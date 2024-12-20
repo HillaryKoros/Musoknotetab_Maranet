@@ -11,6 +11,8 @@
 # Introduction
  Django-based backend designed for flood_watch_system. 
 
+ ![Screenshot](capture.PNG)
+
 # Getting Started
 ### Prerequisites
 Ensure the following are installed on your system:

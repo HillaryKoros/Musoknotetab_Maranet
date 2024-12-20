@@ -15,35 +15,162 @@
             width: 100%;
             height: 500px;
         }
+
+        .legend {
+            line-height: 18px;
+            color: #555;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .legend i {
+            width: 18px;
+            height: 18px;
+            float: left;
+            margin-right: 8px;
+            opacity: 0.7;
+        }
+
+        /* Navbar styling */
+        nav {
+            background-color: #333;
+            text-align: center; /* Center the navbar content */
+            padding: 10px 0;
+        }
+
+        nav ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: inline-block; /* Center the list items */
+        }
+
+        nav ul li {
+            display: inline; /* Display items horizontally */
+            margin-right: 20px;
+        }
+
+        nav ul li a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            font-size: 18px;
+            border-radius: 5px;
+        }
+
+        nav ul li a:hover {
+            background-color: #575757; /* Hover effect */
+        }
     </style>
     <script type="text/javascript" src="{% static 'dist/leaflet.ajax.js' %}"></script>
 </head>
 
 <body>
-    <h3>Welcome to Flood Watch</h3>
+    <h3 style="text-align:center;">Flood Watch System </h3>
+
+    <!-- Navbar -->
+    <nav>
+        <ul>
+            <li><a href="#">Home</a></li>
+            <li><a href="#">Map Viewer</a></li>
+            <li><a href="#">Report</a></li>
+            <li><a href="#">Analysis</a></li>
+        </ul>
+    </nav>
+
     <div id="map"></div>
 
     <script>
+        // Natural breaks classification for values 1-20
+        // These breaks should ideally be calculated using a Jenks algorithm
+        const breaks = [0, 1, 5, 10, 15, 20];
+
+        function getFloodColor(flood_tot) {
+            // Special case for 0 - return null for hollow style
+            // if (flood_tot === 0) return null;
+
+            return flood_tot > 15 ? '#f86c31' :    
+                   flood_tot > 10 ? '#fda649' :    
+                   flood_tot > 5  ? '#fed66d' :    
+                   flood_tot > 1  ? '#ffffb2' :    
+                                  '#ffffff';         
+        }
+
+        function style(feature) {
+            const flood_tot = feature.properties.flood_tot;
+
+            // Base style
+            const baseStyle = {
+                weight: 2,
+                opacity: 1,
+                color: '#666',      // Border color
+                dashArray: '0.3'
+            };
+
+            // If flood_tot is 0, return hollow style
+            if (flood_tot === 0) {
+                return {
+                    ...baseStyle,
+                    fillColor: 'none',
+                    fillOpacity: 0
+                };
+            }
+
+            // Otherwise, return filled style
+            return {
+                ...baseStyle,
+                fillColor: getFloodColor(flood_tot),
+                fillOpacity: 0.7
+            };
+        }
+
         function out_layers(map, options) {
-            // Add GeoJSON data to the map
-            var affectedPop = new L.GeoJSON.AJAX("{% url 'affectedPop' %}", {
-                onEachFeature: function(feature, layer) {
-                    if (feature.properties) {
-                        // Build the popup content dynamically
-                        let popupContent = "<h3>Feature Properties:</h3><ul>";
-                        for (let property in feature.properties) {
-                            popupContent += `<li><strong>${property}:</strong> ${feature.properties[property]}</li>`;
+            // Add GeoJSON data layers
+            var layers = {
+                'Affected Population': new L.GeoJSON.AJAX("{% url 'affectedPop' %}", {
+                    style: style,
+                    onEachFeature: function(feature, layer) {
+                        if (feature.properties) {
+                            let popupContent = "<h3>Population Data:</h3><ul>";
+                            for (let property in feature.properties) {
+                                popupContent += `<li><strong>${property}:</strong> ${feature.properties[property]}</li>`;
+                            }
+                            popupContent += "</ul>";
+                            layer.bindPopup(popupContent);
                         }
-                        popupContent += "</ul>";
-
-                        // Bind the popup to the layer
-                        layer.bindPopup(popupContent);
                     }
-                }
-            });
+                })
+                // Add other layers as needed
+            };
 
-            // Add the layer to the map
-            affectedPop.addTo(map);
+            // Add layer control
+            L.control.layers(null, layers, {
+                collapsed: false
+            }).addTo(map);
+            
+
+            // Add legend
+            var legend = L.control({position: 'bottomright'});
+            legend.onAdd = function (map) {
+                var div = L.DomUtil.create('div', 'legend');
+                div.innerHTML = '<h4>Total population affected</h4>';
+
+                // Add entries for other breaks
+                for (let i = 1; i < breaks.length; i++) {
+                    div.innerHTML +=
+                        '<i style="background:' + getFloodColor(breaks[i]) + '"></i> ' +
+                        breaks[i-1] + (breaks[i] ? '&ndash;' + breaks[i] + '<br>' : '+');
+                }
+
+                return div;
+            };
+            legend.addTo(map);
+
+            // Add layers to map
+            for (var key in layers) {
+                layers[key].addTo(map);
+            }
         }
     </script>
 

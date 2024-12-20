@@ -6,7 +6,7 @@
 - [Getting Started](#GettingStarted)
 - [ Build and Test](#BuildandTest)
 - [Data Synchronization](#DataSynchronization)
-- [Frontend Development (React)](#frontend-development-react)
+- [Frontend Development](#frontend-development)
 
 # Introduction
  Django-based backend designed for flood_watch_system. 
@@ -79,7 +79,6 @@ python manage.py sync_remote_data
 **Note:**: _Data synchronization is currently under development and may experience bugs when pushing to PostgreSQL._
 
 
-# Frontend Development (React) 
-The React frontend will integrate with the Django backend through RESTful APIs.
+# Frontend Development
 
 **Note:**: _Additional details coming soon, the frontend is still under initial stage of development._

@@ -3,63 +3,56 @@ name: Django CI/CD with Conda and pip (Staging)
 on:
   push:
     branches:
-      - main  
+      - main
   pull_request:
     branches:
-      - main  # Trigger on PRs to main branch
+      - main
 
 jobs:
   setup-conda:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout code from GitHub
+      # Step 1: Checkout code
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Step 2: Set up Miniconda environment using environment.yml
+      # Step 2: Install Miniconda and set up the environment
       - name: Set up Conda
         uses: conda-incubator/setup-miniconda@v2
         with:
           miniforge-version: 'latest'
-          activate-environment: 'mydjangoenv'  
-          environment-file: environment.yml 
+          activate-environment: 'mydjangoenv'
+          environment-file: environment.yml
           channels: conda-forge
+        env:
+          CONDA_PKGS_DIRS: "./conda_pkgs"
 
-      # Step 3: Install additional pip dependencies from requirements.txt
-      - name: Install pip dependencies from requirements.txt
+      # Step 3: Install additional pip dependencies
+      - name: Install pip dependencies
         run: |
-          pip install -r requirements.txt  # Install dependencies from requirements.txt
+          pip install --upgrade pip
+          pip install -r requirements.txt
 
-      # Step 4: Set up the database (PostgreSQL, or any database required for staging)
-      - name: Set up the database (PostgreSQL example)
+      # Step 4: Run database setup
+      - name: Set up PostgreSQL
         run: |
-          sudo apt-get install postgresql
+          sudo apt-get update
+          sudo apt-get install -y postgresql
           sudo service postgresql start
 
-      # Step 5: Run Django tests
-      - name: Run Django tests
+      # Step 5: Apply migrations and run tests
+      - name: Apply migrations and run tests
         run: |
-          python manage.py test  # Run tests to validate functionality
+          python manage.py migrate
+          python manage.py test
 
-      # Step 6: Apply database migrations
-      - name: Apply database migrations
-        run: |
-          python manage.py migrate  # Apply any pending migrations
-
-      # Step 7: Collect static files (optional for staging)
+      # Step 6: Collect static files
       - name: Collect static files
         run: |
-          python manage.py collectstatic --noinput  
+          python manage.py collectstatic --noinput
 
-      # Optional: You can add linting or code quality checks here
-      - name: Lint code with flake8
+      # Step 7: Lint code
+      - name: Lint code
         run: |
-          pip install flake8
-          flake8 .  # Lint code to ensure quality
-
-      # Step 8: Deploy to staging 
-      - name: Deploy to Staging (optional)
-        run: |
-          echo "Deploying to staging environment"  
-
+          flake8 .

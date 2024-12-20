@@ -12,7 +12,7 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [3.9.20]  # Using Python 3.9.20 as requested
+        python-version: [3.9]  # Use Python 3.9 without specifying the patch version
 
     steps:
     - uses: actions/checkout@v4

@@ -71,7 +71,7 @@ Ensure the following are installed on your system:
     ```
 
 # Data Synchronization
-To synchronize data from the flood model output server, ensure the remote server credentials are configured in the `.env` file, then run:
+To synchronize data from the floodPROOFS model output server, ensure the remote server credentials are configured in the `.env` file, then run:
 ```bash
 python manage.py sync_data
 ```
@@ -80,9 +80,6 @@ python manage.py sync_data
 
 
 # Frontend Development (React) 
-The React frontend will integrate with the Django backend through RESTful APIs. 
-Key Features:
-- Impact assessment layers of FloodPROOFS 
-- Interactive flood hazard maps
+The React frontend will integrate with the Django backend through RESTful APIs.
 
 **Note:**: _Additional details coming soon, the front is still under initial stage of development._

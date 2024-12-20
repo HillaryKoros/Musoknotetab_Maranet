@@ -1,49 +1,57 @@
 from django.contrib import admin
-from .models import AffectedGrazingLand, AffectedPopulation, ImpactedGDP, AffectedCrops,AffectedLivestock,AffectedRoads,DisplacedPopulation
 from leaflet.admin import LeafletGeoAdmin
+from .models import (
+    AffectedGrazingLand, AffectedPopulation, ImpactedGDP, AffectedCrops,
+    AffectedLivestock, AffectedRoads, DisplacedPopulation
+)
 
+class BaseImpactAdmin(LeafletGeoAdmin):
+    list_display = (
+        'gid_0',
+        'name_0', 
+        'name_1',
+        'engtype_1',
+        'lack_cc',
+        'cod',
+        'stock',
+        'flood_tot',
+        'flood_perc'
+    )
+    search_fields = ('name_0', 'name_1', 'cod')
+    list_filter = ('name_0', 'engtype_1')
+    
+    # Leaflet settings
+    settings_overrides = {
+        'DEFAULT_CENTER': (0.0, 36.0),  # Centered on East Africa
+        'DEFAULT_ZOOM': 4,
+        'MIN_ZOOM': 3,
+        'MAX_ZOOM': 18,
+    }
 
-# Register your models here.
+@admin.register(AffectedPopulation)
+class AffectedPopulationAdmin(BaseImpactAdmin):
+    pass
 
-#create a class called AffectedPopulationAdmin that inherits from admin.ModelAdmin and has the following fields:
-class AffectedPopulationAdmin(LeafletGeoAdmin):
-    list_display = ('name_1', 'cod')
+@admin.register(ImpactedGDP)
+class ImpactedGDPAdmin(BaseImpactAdmin):
+    pass
 
-#create a class called ImpactedGDPAdmin that inherits from admin.ModelAdmin and has the following fields:
-class ImpactedGDPAdmin(LeafletGeoAdmin):
-    list_display = ('name_1', 'cod')
+@admin.register(AffectedCrops)
+class AffectedCropsAdmin(BaseImpactAdmin):
+    pass
 
-#create a class called AffectedCropsAdmin that inherits from admin.ModelAdmin and has the following fields:
-class AffectedCropsAdmin(LeafletGeoAdmin):
-    list_display = ('name_1', 'cod')
+@admin.register(AffectedGrazingLand)
+class AffectedGrazingLandAdmin(BaseImpactAdmin):
+    pass
 
-#create a class called AffectedGrazingLandAdmin that inherits from admin.ModelAdmin and has the following fields:
-class AffectedGrazingLandAdmin(LeafletGeoAdmin):
-    list_display = ('name_1', 'cod')
+@admin.register(AffectedLivestock)
+class AffectedLivestockAdmin(BaseImpactAdmin):
+    pass
 
-# creatte  a class called affected_livestockAdmin that inherits from admin.ModelAdmin and has the following fields:
-class AffectedLivestockAdmin(LeafletGeoAdmin):
-    list_display = ('name_1', 'cod')
+@admin.register(AffectedRoads)
+class AffectedRoadsAdmin(BaseImpactAdmin):
+    pass
 
-# creatte  a class called affected_roadsAdmin that inherits from admin.ModelAdmin and has the following fields:
-class AffectedRoadsAdmin(LeafletGeoAdmin):
-    list_display = ('name_1', 'cod')
-
-#create a class called DisplacedPopulationAdmin that inherits from admin.ModelAdmin and has the following fields:
-class DisplacedPopulationAdmin(LeafletGeoAdmin):
-    list_display = ('name_1', 'cod')
-
-
-# Register the models with the admin site
-admin.site.register(AffectedPopulation, AffectedPopulationAdmin)
-admin.site.register(ImpactedGDP, ImpactedGDPAdmin)
-admin.site.register(AffectedCrops, AffectedCropsAdmin)
-admin.site.register(AffectedGrazingLand, AffectedGrazingLandAdmin)
-admin.site.register(AffectedLivestock, AffectedLivestockAdmin)
-admin.site.register(AffectedRoads, AffectedRoadsAdmin)
-admin.site.register(DisplacedPopulation, DisplacedPopulationAdmin)
-
-
-
-
-
+@admin.register(DisplacedPopulation)
+class DisplacedPopulationAdmin(BaseImpactAdmin):
+    pass

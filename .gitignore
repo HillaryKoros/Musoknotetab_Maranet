@@ -6,7 +6,7 @@
 
 # Ignore compiled files
 *.pyc
-__pycache__/
+*. __pycache__/
 
 # Ignore Django migrations
 */migrations/*

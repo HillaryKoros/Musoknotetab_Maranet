@@ -1,6 +1,3 @@
-# Ignore database files
-*.sqlite3
-
 # Ignore environment variables
 .env
 

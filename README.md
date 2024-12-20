@@ -7,7 +7,7 @@
 - [ Build and Test](#BuildandTest)
 - [Data Synchronization](#DataSynchronization)
 - [Frontend Development](#frontend-development)
-
+   
 # Introduction
  Django-based backend designed for flood_watch_system. 
 

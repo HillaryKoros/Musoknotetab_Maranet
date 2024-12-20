@@ -73,7 +73,7 @@ Ensure the following are installed on your system:
 # Data Synchronization
 To synchronize data from the floodPROOFS model output server, ensure the remote server credentials are configured in the `.env` file, then run:
 ```bash
-python manage.py sync_data
+python manage.py sync_remote_data
 ```
 
 **Note:**: _Data synchronization is currently under development and may experience bugs when pushing to PostgreSQL._

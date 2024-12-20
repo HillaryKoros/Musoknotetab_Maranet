@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+{% load static %}
+{% load leaflet_tags %}
+
+<head>
+    {% leaflet_js %}
+    {% leaflet_css %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flood Watch</title>
+    <style>
+        #map {
+            width: 100%;
+            height: 500px;
+        }
+    </style>
+    <script type="text/javascript" src="{% static 'dist/leaflet.ajax.js' %}"></script>
+</head>
+
+<body>
+    <h3>Welcome to Flood Watch</h3>
+    <div id="map"></div>
+
+    <script>
+        function out_layers(map, options) {
+            // Add GeoJSON data to the map
+            var affectedPop = new L.GeoJSON.AJAX("{% url 'affectedPop' %}", {
+                onEachFeature: function(feature, layer) {
+                    if (feature.properties) {
+                        // Build the popup content dynamically
+                        let popupContent = "<h3>Feature Properties:</h3><ul>";
+                        for (let property in feature.properties) {
+                            popupContent += `<li><strong>${property}:</strong> ${feature.properties[property]}</li>`;
+                        }
+                        popupContent += "</ul>";
+
+                        // Bind the popup to the layer
+                        layer.bindPopup(popupContent);
+                    }
+                }
+            });
+
+            // Add the layer to the map
+            affectedPop.addTo(map);
+        }
+    </script>
+
+    {% leaflet_map "map" callback="window.out_layers" %}
+</body>
+
+</html>

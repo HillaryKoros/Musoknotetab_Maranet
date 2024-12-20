@@ -18,3 +18,6 @@ media/
 # Ignore system files
 .DS_Store
 Thumbs.db
+
+# Ignore conda environment directories
+/environment.yml

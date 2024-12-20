@@ -1,5 +1,5 @@
 altair==5.5.0
-asgiref @ file:///C:/b/abs_ae1n0p_8_w/croot/asgiref_1724072476516/work
+asgiref==3.8.1
 asttokens==3.0.0
 attrs==24.2.0
 bcrypt==4.2.1
@@ -85,7 +85,7 @@ plotly==5.24.1
 prompt_toolkit==3.0.48
 proto-plus==1.25.0
 protobuf==5.29.0
-psycopg2 @ file:///C:/b/abs_3ei4rka0ip/croot/psycopg2_1731693723700/work
+psycopg2==2.9.9
 pure_eval==0.2.3
 pyarrow==18.1.0
 pyasn1==0.6.1
@@ -114,7 +114,7 @@ scooby==0.10.0
 shapely==2.0.6
 six==1.16.0
 smmap==5.0.1
-sqlparse @ file:///C:/b/abs_88361ub_qu/croot/sqlparse_1690904577514/work
+sqlparse==0.4.4
 stack-data==0.6.3
 streamlit==1.40.2
 tenacity==9.0.0

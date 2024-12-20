@@ -21,9 +21,10 @@ jobs:
       - name: Set up Conda
         uses: conda-incubator/setup-miniconda@v2
         with:
-          miniconda-version: 'latest'
-          activate-environment: 'mydjangoenv'  # You can replace with your environment name
-          environment-file: environment.yml  # Path to the Conda environment file
+          miniforge-version: 'latest'
+          activate-environment: 'mydjangoenv'  
+          environment-file: environment.yml 
+          channels: conda-forge
 
       # Step 3: Install additional pip dependencies from requirements.txt
       - name: Install pip dependencies from requirements.txt
@@ -49,7 +50,7 @@ jobs:
       # Step 7: Collect static files (optional for staging)
       - name: Collect static files
         run: |
-          python manage.py collectstatic --noinput  # This step is optional for staging
+          python manage.py collectstatic --noinput  
 
       # Optional: You can add linting or code quality checks here
       - name: Lint code with flake8
@@ -57,9 +58,8 @@ jobs:
           pip install flake8
           flake8 .  # Lint code to ensure quality
 
-      # Step 8: Deploy to staging (Optional - adjust this step as needed)
-      # If you don't have a staging deployment, you can skip this step
+      # Step 8: Deploy to staging 
       - name: Deploy to Staging (optional)
         run: |
-          echo "Deploying to staging environment"  # Add your staging deployment script/commands here
+          echo "Deploying to staging environment"  
 

@@ -1,7 +1,8 @@
 # Flood Watch System
 
 ## Overview
-The **Flood Watch System** is a robust, Django-based backend designed for monitoring and analyzing the socio-economic and environmental impacts of floods. It processes probabilistic model outputs, hazard maps, and near/real-time monitoring data to deliver actionable insights.
+The **Flood Watch System** is a robust, Django-based backend designed for monitoring and analyzing the socio-economic and environmental impacts of floods. 
+It processes probabilistic model outputs, hazard maps, and near/real-time monitoring data to deliver actionable insights.
 
 ## Developed Models
  These models are capable of receiving and processing data in the local database. The models represent the impacts of flooding on various sectors. 
@@ -14,6 +15,8 @@ The **Flood Watch System** is a robust, Django-based backend designed for monito
 5. **Displaced Population**: Identifies the number of people displaced by flooding.
 6. **Affected Livestock**: Tracks the number of livestock affected by flooding.
 7. **Affected Grazing Land**: Assesses the loss of grazing land due to floods.
+
+
 _All of this is at the Admin 2 level of the member states_
 
 ## Hazard Maps

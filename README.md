@@ -82,4 +82,4 @@ python manage.py sync_data
 # Frontend Development (React) 
 The React frontend will integrate with the Django backend through RESTful APIs.
 
-**Note:**: _Additional details coming soon, the front is still under initial stage of development._
+**Note:**: _Additional details coming soon, the frontend is still under initial stage of development._

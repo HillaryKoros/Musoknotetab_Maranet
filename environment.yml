@@ -1,80 +1,55 @@
-
-# platform: win-64
-# created-by: conda 24.9.2
-
-name: mydjangoenv
+name: mydjangoenv  # Name of the environment
 channels:
   - conda-forge
   - defaults
 dependencies:
   - python=3.9
-  - pip
+  - pip  # Ensure pip is available
+  - gdal=3.10.0=py39h3e1b94b_9  # Core geospatial libraries
+  - geopandas=1.0.1=pypi_0  # Core geospatial libraries
+  - geos=3.13.0=h5a68840_0
+  - libpq=17.2=h81f3393_1  # For PostgreSQL support
+  - psycopg2=2.9.9=py39h827c3e9_1  # PostgreSQL support
+  - libcurl=8.11.1=h88aaa65_0
+  - libxml2=2.13.5=he286e8c_1
+  - pyproj=3.6.1=pypi_0
+  - sqlite=3.45.3=h2bbff1b_0
   - pip:
+      - bcrypt==4.2.1
+      - blinker==1.9.0
+      - certifi==2024.12.14
+      - click==8.1.7
+      - colorama==0.4.6
+      - cryptography==44.0.0
+      - django==4.2.17
+      - django-environ==0.11.2
+      - django-leaflet==0.31.0
+      - djangorestframework==3.15.2
+      - flask==3.1.0
+      - flask-cors==5.0.0
+      - gunicorn==23.0.0
+      - importlib-metadata==8.5.0
+      - itsdangerous==2.2.0
+      - jinja2==3.1.4
+      - markupsafe==3.0.2
+      - pandas==2.2.3
+      - paramiko==3.5.0
+      - packaging==24.2
+      - psycopg2==2.9.9
+      - python-dateutil==2.9.0.post0
+      - python-decouple==3.8
+      - python-dotenv==1.0.1
+      - pytz==2024.2
+      - rav1e==0.6.6
+      - shapely==2.0.6
+      - six==1.16.0
       - werkzeug==3.1.3
       - wheel==0.44.0
       - zipp==3.21.0
       - tzdata==2024.2
       - typing_extensions==4.11.0
-      - six==1.16.0
-      - shapely==2.0.6
-      - python-dotenv==1.0.1
-      - python-decouple==3.8
-      - python-dateutil==2.9.0.post0
-      - pytz==2024.2
-      - pyscopg2==2.9.9
-      - pip==24.2
-      - packaging==24.2
-      - numpy==2.0.2
-      - pandas==2.2.3
-      - psycopg2==2.9.9
-      - geos==3.13.0
-      - geopandas==1.0.1
-      - flask-cors==5.0.0
-      - flask==3.1.0
-      - djangorestframework==3.15.2
-      - django-leaflet==0.31.0
-      - django-environ==0.11.2
-      - django==4.2.17
-      - cryptography==44.0.0
-      - colorama==0.4.6
-      - click==8.1.7
-      - cffi==1.17.1
-  - geos
-  - gdal
-  - numpy
-  - libpq
-  - libcurl
-  - libxml2
-  - libiconv
-  - libtiff
-  - libpng
-  - libsqlite
-  - sqlite
-  - libdeflate
-  - pyproj
-  - liblzma
-  - libssh2
-  - libspatialite
-  - lz4-c
-  - libgdal-core
-  - lzo
-  - blosc
-  - bzip2
-  - _libavif_api
-  - dav1d
-  - aom
-  - minizip
-  - zlib
-  - zstd
-  - tbb
-  - svt-av1
-  - rttopo
-  - shapely
-  - pycparser
-  - importlib-metadata
-  - asgiref
-  - gunicorn
-  - pyogrio
-  - paramiko
-  - geotiff
-  - geos
+      - svt-av1==2.3.0
+      - tbb==2021.13.0
+      - x265==3.5
+      - zstd==1.5.6
+      - zlib==1.3.1

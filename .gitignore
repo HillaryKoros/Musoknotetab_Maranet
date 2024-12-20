@@ -19,5 +19,3 @@ media/
 .DS_Store
 Thumbs.db
 
-# Ignore conda environment directories
-/environment.yml

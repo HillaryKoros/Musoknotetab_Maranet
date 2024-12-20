@@ -1,4 +1,4 @@
-name: Django CI/CD with Conda and pip (Staging)
+name: Django CI/CD
 
 on:
   push:
@@ -9,50 +9,43 @@ on:
       - main
 
 jobs:
-  setup-conda:
+  build:
     runs-on: ubuntu-latest
-
+    
     steps:
-      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      # Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      # Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      # Run tests (you can change this step if you're using a different testing framework)
+      - name: Run tests
+        run: |
+          source venv/bin/activate
+          python manage.py test  # Replace this with your test command
+
+  # Optional: Deploy the app (for example, using AWS, Heroku, etc.)
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Step 2: Install Miniconda and set up the environment
-      - name: Set up Conda
-        uses: conda-incubator/setup-miniconda@v2
-        with:
-          miniforge-version: 'latest'
-          activate-environment: 'mydjangoenv'
-          environment-file: environment.yml
-          channels: conda-forge
-        env:
-          CONDA_PKGS_DIRS: "./conda_pkgs"
-
-      # Step 3: Install additional pip dependencies
-      - name: Install pip dependencies
+      # Example deployment step (this can vary depending on your deployment setup)
+      - name: Deploy to production
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-
-      # Step 4: Run database setup
-      - name: Set up PostgreSQL
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql
-          sudo service postgresql start
-
-      # Step 5: Apply migrations and run tests
-      - name: Apply migrations and run tests
-        run: |
-          python manage.py migrate
-          python manage.py test
-
-      # Step 6: Collect static files
-      - name: Collect static files
-        run: |
-          python manage.py collectstatic --noinput
-
-      # Step 7: Lint code
-      - name: Lint code
-        run: |
-          flake8 .
+          # Your deployment script or commands go here
+          echo "Deploying Django app..."

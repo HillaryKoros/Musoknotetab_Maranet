@@ -16,13 +16,17 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# GDAL and GEOS library paths
-GDAL_LIBRARY_PATH = r'C:\OSGeo4W\bin\gdal309.dll'
-GEOS_LIBRARY_PATH = r'C:\OSGeo4W\bin\geos_c.dll'
+# # GDAL and GEOS library paths
+# GDAL_LIBRARY_PATH = r'C:\OSGeo4W\bin\gdal309.dll'
+# GEOS_LIBRARY_PATH = r'C:\OSGeo4W\bin\geos_c.dll'
 
-# Set environment variables for GDAL and PROJ
-os.environ['GDAL_DATA'] = r'C:\OSGeo4W\share\gdal'
-os.environ['PROJ_LIB'] = r'C:\OSGeo4W\share\proj'
+# GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH', '/usr/lib/x86_64-linux-gnu/gdal')
+# GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH', '/usr/lib/x86_64-linux-gnu/libgeos_c.so')
+
+
+# # # Set environment variables for GDAL and PROJ
+# os.environ['GDAL_DATA'] = r'C:\OSGeo4W\share\gdal'
+# os.environ['PROJ_LIB'] = r'C:\OSGeo4W\share\proj'
 
 
 # Quick-start development settings - unsuitable for production
@@ -92,8 +96,8 @@ DATABASES = {
         'NAME': config('DB_NAME'),
         'USER': config('DB_USER'),
         'PASSWORD': config('DB_PASSWORD'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
+        'HOST': config('DB_HOST'),
+        'PORT': config('DB_PORT'),
     }
 }
 

@@ -13,6 +13,14 @@ class HomeView(TemplateView):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Flood Watch System'
         return context
+    
+class MapView(TemplateView):
+    template_name = 'MapView.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'MapView'
+        return context
 
 
 def affectedPop(request):

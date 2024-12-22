@@ -21,13 +21,13 @@ class Command(BaseCommand):
     
     # Dynamically generate filenames based on the current date
     model_configurations = {
-        AffectedPopulation: f'{current_date}0000_FPimpacts-Population.shp',
-        ImpactedGDP: f'{current_date}0000_FPimpacts-GDP.shp',
-        AffectedCrops: f'{current_date}0000_FPimpacts-Crops.shp',
-        AffectedRoads: f'{current_date}0000_FPimpacts-KmRoads.shp',
-        DisplacedPopulation: f'{current_date}0000_FPimpacts-Displaced.shp',
-        AffectedLivestock: f'{current_date}0000_FPimpacts-Livestock.shp',
-        AffectedGrazingLand: f'{current_date}0000_FPimpacts-Grazing.shp',
+        AffectedPopulation: f'202412210000_FPimpacts-Population.shp',
+        ImpactedGDP: f'202412210000_FPimpacts-GDP.shp',
+        AffectedCrops: f'202412210000_FPimpacts-Crops.shp',
+        AffectedRoads: f'202412210000_FPimpacts-KmRoads.shp',
+        DisplacedPopulation: f'202412210000_FPimpacts-Displaced.shp',
+        AffectedLivestock: f'202412210000_FPimpacts-Livestock.shp',
+        AffectedGrazingLand: f'202412210000_FPimpacts-Grazing.shp',
 }
     
     field_mapping = {

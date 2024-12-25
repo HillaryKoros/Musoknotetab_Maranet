@@ -10,6 +10,8 @@ from Impact.models import (
     AffectedRoads, DisplacedPopulation, AffectedLivestock,
     AffectedGrazingLand
 )
+
+ #
 # Get the current date in the required format
 current_date = datetime.now().strftime('%Y%m%d')
 

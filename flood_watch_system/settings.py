@@ -13,6 +13,7 @@ import os
 from decouple import config, Csv
 from pathlib import Path
 
+# to update next
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 

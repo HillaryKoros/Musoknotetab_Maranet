@@ -1,61 +1,54 @@
-from django.shortcuts import render
-from django.views.generic import TemplateView
-from django.core import serializers
-from django.http import HttpResponse
-from .models import AffectedPopulation, ImpactedGDP, AffectedCrops, AffectedGrazingLand, AffectedLivestock, AffectedRoads, DisplacedPopulation
-# Create your views here.
+from drf_spectacular.utils import extend_schema
+from drf_spectacular.openapi import AutoSchema
+from rest_framework import viewsets
+from .serializers import (
+    AffectedPopulationSerializer, ImpactedGDPSerializer, AffectedCropsSerializer,
+    AffectedRoadsSerializer, DisplacedPopulationSerializer, AffectedLivestockSerializer,
+    AffectedGrazingLandSerializer
+)
+from .models import (
+    AffectedPopulation, ImpactedGDP, AffectedCrops, AffectedGrazingLand,
+    AffectedLivestock, AffectedRoads, DisplacedPopulation
+)
 
-#
-class HomeView(TemplateView):
-    template_name = 'home.html'
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['title'] = 'Flood Watch System'
-        return context
-    
-class MapView(TemplateView):
-    template_name = 'MapView.html'
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['title'] = 'MapView'
-        return context
+@extend_schema(tags=['affected-population'])
+class AffectedPopulationViewSet(viewsets.ModelViewSet):
+    schema = AutoSchema()
+    queryset = AffectedPopulation.objects.all()
+    serializer_class = AffectedPopulationSerializer
 
+@extend_schema(tags=['impacted-gdp'])
+class ImpactedGDPViewSet(viewsets.ModelViewSet):
+    schema = AutoSchema()
+    queryset = ImpactedGDP.objects.all()
+    serializer_class = ImpactedGDPSerializer
 
-def affectedPop(request):
-    affectedPop = AffectedPopulation.objects.all()
-    affectedPop = serializers.serialize('geojson', affectedPop)
-    return HttpResponse(affectedPop, content_type='json')
+@extend_schema(tags=['affected-crops'])
+class AffectedCropsViewSet(viewsets.ModelViewSet):
+    schema = AutoSchema()
+    queryset = AffectedCrops.objects.all()
+    serializer_class = AffectedCropsSerializer
 
-def affectedGDP(request):
-    affectedGDP = ImpactedGDP.objects.all()
-    affectedGDP = serializers.serialize('geojson', affectedGDP)
-    return HttpResponse(affectedGDP, content_type='json')
+@extend_schema(tags=['affected-roads'])
+class AffectedRoadsViewSet(viewsets.ModelViewSet):
+    schema = AutoSchema()
+    queryset = AffectedRoads.objects.all()
+    serializer_class = AffectedRoadsSerializer
 
-def affectedCrops(request):
-    affectedCrops = AffectedCrops.objects.all()
-    affectedCrops = serializers.serialize('geojson', affectedCrops)
-    return HttpResponse(affectedCrops, content_type='json')
+@extend_schema(tags=['displaced-population'])
+class DisplacedPopulationViewSet(viewsets.ModelViewSet):
+    schema = AutoSchema()
+    queryset = DisplacedPopulation.objects.all()
+    serializer_class = DisplacedPopulationSerializer
 
-def affectedGrazingLand(request):
-    affectedGrazingLand = AffectedGrazingLand.objects.all()
-    affectedGrazingLand = serializers.serialize('geojson', affectedGrazingLand)
-    return HttpResponse(affectedGrazingLand, content_type='json')
+@extend_schema(tags=['affected-livestock'])
+class AffectedLivestockViewSet(viewsets.ModelViewSet):
+    schema = AutoSchema()
+    queryset = AffectedLivestock.objects.all()
+    serializer_class = AffectedLivestockSerializer
 
-def affectedLivestock(request): 
-    affectedLivestock = AffectedLivestock.objects.all()
-    affectedLivestock = serializers.serialize('geojson', affectedLivestock)
-    return HttpResponse(affectedLivestock, content_type='json')
-
-def affectedRoads(request):
-    affectedRoads = AffectedRoads.objects.all()
-    affectedRoads = serializers.serialize('geojson', affectedRoads)
-    return HttpResponse(affectedRoads, content_type='json') 
-
-def displacedPop(request):
-    displacedPop = DisplacedPopulation.objects.all()
-    displacedPop = serializers.serialize('geojson', displacedPop)
-    return HttpResponse(displacedPop, content_type='json')
-
-
+@extend_schema(tags=['affected-grazing-land'])
+class AffectedGrazingLandViewSet(viewsets.ModelViewSet):
+    schema = AutoSchema()
+    queryset = AffectedGrazingLand.objects.all()
+    serializer_class = AffectedGrazingLandSerializer

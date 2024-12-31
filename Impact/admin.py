@@ -20,13 +20,13 @@ class BaseImpactAdmin(LeafletGeoAdmin):
     search_fields = ('name_0', 'name_1', 'cod')
     list_filter = ('name_0', 'engtype_1')
     
-    # Leaflet settings
-    settings_overrides = {
-        'DEFAULT_CENTER': (0.0, 36.0),  # Centered on East Africa
-        'DEFAULT_ZOOM': 4,
-        'MIN_ZOOM': 3,
-        'MAX_ZOOM': 18,
-    }
+    # # Leaflet settings
+    # settings_overrides = {
+    #     'DEFAULT_CENTER': (0.0, 36.0),  # Centered on East Africa
+    #     'DEFAULT_ZOOM': 4,
+    #     'MIN_ZOOM': 3,
+    #     'MAX_ZOOM': 18,
+    # }
 
 @admin.register(AffectedPopulation)
 class AffectedPopulationAdmin(BaseImpactAdmin):

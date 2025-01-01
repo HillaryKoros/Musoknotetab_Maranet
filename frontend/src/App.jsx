@@ -35,13 +35,13 @@ const MapWithNavbar = () => {
   const zoom = 5;
 
   const layerURLs = {
-    affectedPop: 'http://127.0.0.1:8000/api/api/affectedPop/',
-    affectedGDP: 'http://127.0.0.1:8000/api/api/affectedGDP/',
-    affectedCrops: 'http://127.0.0.1:8000/api/api/affectedCrops/',
-    affectedRoads: 'http://127.0.0.1:8000/api/api/affectedRoads/',
-    displacedPop: 'http://127.0.0.1:8000/api/api/displacedPop/',
-    affectedLivestock: 'http://127.0.0.1:8000/api/api/affectedLivestock/',
-    affectedGrazingLand: 'http://127.0.0.1:8000/api/api/affectedGrazingLand/',
+    affectedPop: 'http://127.0.0.1:8000/api/affectedPop/',
+    affectedGDP: 'http://127.0.0.1:8000/api/affectedGDP/',
+    affectedCrops: 'http://127.0.0.1:8000/api/affectedCrops/',
+    affectedRoads: 'http://127.0.0.1:8000/api/affectedRoads/',
+    displacedPop: 'http://127.0.0.1:8000/api/displacedPop/',
+    affectedLivestock: 'http://127.0.0.1:8000/api/affectedLivestock/',
+    affectedGrazingLand: 'http://127.0.0.1:8000/api/affectedGrazingLand/',
   };
 
   const basemaps = [

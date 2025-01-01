@@ -62,3 +62,30 @@
   display: inline-block;
   border: 1px solid black;
 }
+
+
+/* Custom navbar header and footer */
+.navbar-custom {
+  background-color: #9fcd32; /* Solid green */
+  border-bottom: 2px solid #228B22; /* Slightly darker green border */
+}
+
+.navbar-custom .navbar-brand,
+.navbar-custom .nav-link {
+  color: black !important; /* Black text */
+  font-weight: bold;
+}
+
+.navbar-custom .navbar-brand:hover,
+.navbar-custom .nav-link:hover {
+  color: #006400 !important; /* Dark green hover effect */
+}
+
+.footer-custom {
+  background-color: #a4cd32; /* Solid green */
+  text-align: center;
+  color: black; /* Black text */
+  padding: 1rem;
+  border-top: 2px solid #228B22;
+}
+

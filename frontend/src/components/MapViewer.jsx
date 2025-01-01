@@ -27,8 +27,8 @@ const MapViewer = () => {
     },
     {
       name: 'Satellite',
-      url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
-      attribution: '&copy; OpenStreetMap contributors',
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      attribution: '&copy; ESRI, Maxar',
     },
     {
       name: 'Topographic',

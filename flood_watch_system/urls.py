@@ -25,6 +25,6 @@ urlpatterns = [
     path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('api/schema/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 
-     path('', TemplateView.as_view(template_name='/index.html'), name='home'),  # Frontend routes
+    #  path('', TemplateView.as_view(template_name='/frontend/index.html'), name='home'),  # Frontend routes
 
 ]

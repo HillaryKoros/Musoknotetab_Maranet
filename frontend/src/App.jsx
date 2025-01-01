@@ -7,15 +7,14 @@ const MapWithNavbar = () => {
   const position = [4.6818, 34.9911];
   const zoom = 5;
 
-  // URLs for your layers
   const layerURLs = {
-    affectedPop: "http://127.0.0.1:8000/affectedPop/",
-    affectedGDP: "http://127.0.0.1:8000/affectedGDP/",
-    affectedCrops: "http://127.0.0.1:8000/affectedCrops/",
-    affectedRoads: "http://127.0.0.1:8000/affectedRoads/",
-    displacedPop: "http://127.0.0.1:8000/displacedPop/",
-    affectedLivestock: "http://127.0.0.1:8000/affectedLivestock/",
-    affectedGrazingLand: "http://127.0.0.1:8000/affectedGrazingLand/",
+    affectedPop: "http://127.0.0.1:8000//api/api/affectedPop/",
+    affectedGDP: "http://127.0.0.1:8000//api/api/affectedGDP/",
+    affectedCrops: "http://127.0.0.1:8000//api/api/affectedCrops/",
+    affectedRoads: "http://127.0.0.1:8000//api/api/affectedRoads/",
+    displacedPop: "http://127.0.0.1:8000//api/api/displacedPop/",
+    affectedLivestock: "http://127.0.0.1:8000//api/api/affectedLivestock/",
+    affectedGrazingLand: "http://127.0.0.1:8000//api/api/affectedGrazingLand/",
   };
 
   const [selectedLayers, setSelectedLayers] = useState({});
@@ -24,15 +23,32 @@ const MapWithNavbar = () => {
 
   const fetchLayerData = async (layerKey) => {
     try {
-      const response = await fetch(layerURLs[layerKey]);
+      console.log(`Fetching ${layerKey} from ${layerURLs[layerKey]}`);
+      
+      const response = await fetch(layerURLs[layerKey], {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        }
+      });
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
       const data = await response.json();
+      console.log(`Received data for ${layerKey}:`, data);
+      
+      // Check if we received valid GeoJSON
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid data received');
+      }
+      
       return data;
     } catch (error) {
-      console.error("Error fetching layer:", error);
-      throw error;
+      console.error(`Error fetching ${layerKey}:`, error);
+      throw new Error(`Failed to fetch ${layerKey}: ${error.message}`);
     }
   };
 
@@ -48,12 +64,16 @@ const MapWithNavbar = () => {
       setError(null);
       
       try {
+        console.log(`Starting to load ${layerKey}`);
         const data = await fetchLayerData(layerKey);
+        console.log(`Successfully loaded ${layerKey}`, data);
+        
         setSelectedLayers((prev) => ({
           ...prev,
           [layerKey]: data
         }));
       } catch (error) {
+        console.error(`Error in handleLayerToggle for ${layerKey}:`, error);
         setError(`Failed to load ${layerKey}: ${error.message}`);
       } finally {
         setLoadingLayers((prev) => prev.filter(key => key !== layerKey));
@@ -63,7 +83,6 @@ const MapWithNavbar = () => {
 
   return (
     <div className="app-wrapper">
-      {/* Navigation Bar */}
       <Navbar bg="dark" variant="dark" expand="lg">
         <Container>
           <Navbar.Brand href="#home">GIS Dashboard</Navbar.Brand>
@@ -79,7 +98,6 @@ const MapWithNavbar = () => {
       </Navbar>
 
       <div className="app-container">
-        {/* Sidebar */}
         <div className="sidebar">
           <h4>Layers</h4>
           
@@ -107,25 +125,44 @@ const MapWithNavbar = () => {
           </ListGroup>
         </div>
 
-        {/* Map Container */}
         <div className="map-container">
           <MapContainer
             center={position}
             zoom={zoom}
             scrollWheelZoom={true}
+            style={{ height: "100%", width: "100%" }}
           >
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            {Object.entries(selectedLayers).map(([key, data]) => (
-              <GeoJSON key={key} data={data}>
-                <Popup>
-                  <strong>{key}</strong>
-                  <p>Layer data loaded successfully</p>
-                </Popup>
-              </GeoJSON>
-            ))}
+            {Object.entries(selectedLayers).map(([key, data]) => {
+              console.log(`Rendering layer ${key}:`, data);
+              return (
+                <GeoJSON 
+                  key={key} 
+                  data={data}
+                  style={() => ({
+                    fillColor: '#3388ff',
+                    weight: 2,
+                    opacity: 1,
+                    color: 'white',
+                    dashArray: '3',
+                    fillOpacity: 0.7
+                  })}
+                  onEachFeature={(feature, layer) => {
+                    if (feature.properties) {
+                      layer.bindPopup(`
+                        <div>
+                          <h4>${key}</h4>
+                          <pre>${JSON.stringify(feature.properties, null, 2)}</pre>
+                        </div>
+                      `);
+                    }
+                  }}
+                />
+              );
+            })}
           </MapContainer>
         </div>
       </div>

@@ -54,7 +54,7 @@ INSTALLED_APPS = [
     'django.contrib.gis',
     'rest_framework',
     'rest_framework_gis',
-    # 'corsheaders',
+    'corsheaders',
     'rest_framework.authtoken',
     'drf_spectacular',
     'leaflet',
@@ -64,8 +64,8 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
-    # 'corsheaders.middleware.CorsMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -73,7 +73,25 @@ MIDDLEWARE = [
 ]
 
 
-# CORS_ALLOWED_ORIGINS = True
+# CORS settings
+CORS_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:5173",  #React development server
+    "http://localhost:5173",
+]
+
+CORS_ALLOW_METHODS = [
+    'GET',
+    'OPTIONS'
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'origin',
+    'user-agent',
+]
 
 
 ROOT_URLCONF = 'flood_watch_system.urls'

@@ -8,7 +8,28 @@ const { BaseLayer } = LayersControl;
 const MapViewer = () => {
   const position = [4.6818, 34.9911];
   const zoom = 5;
+ 
+  // ==============================================
+  // GeoServer WMS Configuration (to be integrated later)
+  // ==============================================
+  /*
+  const geoServerBaseURL = 'http://localhost:8080/geoserver/floodwatch/wms?';
+  const commonParams = 'service=WMS&version=1.1.0&request=GetMap&format=image/png';
+  
+  const layerURLs = {
+    affectedPop: `${geoServerBaseURL}${commonParams}&layers=floodwatch:Impact_affectedpop`,
+    affectedGDP: `${geoServerBaseURL}${commonParams}&layers=floodwatch:Impact_affectedgdp`,
+    affectedCrops: `${geoServerBaseURL}${commonParams}&layers=floodwatch:Impact_affectedcrops`,
+    affectedRoads: `${geoServerBaseURL}${commonParams}&layers=floodwatch:Impact_affectedroads`,
+    displacedPop: `${geoServerBaseURL}${commonParams}&layers=floodwatch:Impact_displacedpop`,
+    affectedLivestock: `${geoServerBaseURL}${commonParams}&layers=floodwatch:Impact_affectedlivestock`,
+    affectedGrazingLand: `${geoServerBaseURL}${commonParams}&layers=floodwatch:Impact_affectedgrazinglands`,
+  };
+  */
 
+  // ==============================================
+  // REST API Configuration
+  // ==============================================
   const layerURLs = {
     affectedPop: 'http://127.0.0.1:8000/api/affectedPop/',
     affectedGDP: 'http://127.0.0.1:8000/api/affectedGDP/',
@@ -41,7 +62,7 @@ const MapViewer = () => {
   const [loadingLayer, setLoadingLayer] = useState(null);
   const [error, setError] = useState(null);
 
-  // Reuse the same color and style functions from the original code
+  // Styling for GeoJSON data
   const breaks = [-1, 0, 5, 10, 20];
   const getFloodColor = (flood_tot) => {
     if (flood_tot < 0) return 'transparent';
@@ -129,11 +150,12 @@ const MapViewer = () => {
         >
           <LayersControl position="topright">
             {basemaps.map((basemap, index) => (
-              <BaseLayer key={index} name={basemap.name}>
+              <BaseLayer key={index} name={basemap.name} checked={index === 0}>
                 <TileLayer url={basemap.url} attribution={basemap.attribution} />
               </BaseLayer>
             ))}
           </LayersControl>
+          
           {selectedLayer && (
             <GeoJSON
               data={selectedLayer.data}

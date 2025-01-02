@@ -51,7 +51,7 @@ const Reports = () => {
     if (!data || !data.features) return [];
     return data.features
       .map(feature => ({
-        name: feature.properties.name || 'Unknown',
+        name: feature.properties.name_1 || 'Unknown',
         value: feature.properties.flood_tot || 0
       }))
       .filter(item => item.value > 0)

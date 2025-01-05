@@ -6,19 +6,19 @@ const Home = () => {
   const features = [
     {
       title: 'Interactive Map Viewer',
-      description: 'Explore geographic data layers with our interactive map interface',
+      description: 'Explore flood related  data layers with interactive map interface',
       link: '/map',
       icon: '🗺️'
     },
     {
       title: 'Data Reports',
-      description: 'View comprehensive reports and statistics for different layers',
+      description: 'View reports and statistics for different layers',
       link: '/reports',
       icon: '📊'
     },
     {
       title: 'Advanced Analysis',
-      description: 'Perform detailed analysis of geographic and demographic data',
+      description: 'Perform analysis of flood and demographic data',
       link: '/analysis',
       icon: '📈'
     }

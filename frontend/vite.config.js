@@ -11,8 +11,10 @@ export default defineConfig({
     proxy: {
       '/geoserver': {
         target: 'http://localhost:8080',
-        changeOrigin: true
+        changeOrigin: true,
+        secure: false,
       }
     }
   }
 });
+

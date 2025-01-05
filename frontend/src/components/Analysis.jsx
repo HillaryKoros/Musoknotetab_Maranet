@@ -246,7 +246,7 @@ const Analysis = () => {
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold mb-4">Advanced Analysis Dashboard</h2>
+      {/* <h2 className="text-2xl font-bold mb-4">Advanced Analysis Dashboard</h2> */}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
         <div>

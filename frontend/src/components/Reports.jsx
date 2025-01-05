@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Spinner, Alert, Tab, Tabs } from 'react-bootstrap';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer,
-  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+  PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer,AreaChart, Area,ScatterChart, Scatter
 } from 'recharts';
 
 const Reports = () => {
@@ -183,12 +182,16 @@ const Reports = () => {
                 <Card.Body>
                   <Card.Title>Affected Crops Analysis</Card.Title>
                   <ResponsiveContainer width="100%" height={300}>
-                    <RadarChart data={processDataForCharts(data.affectedCrops)}>
-                      <PolarGrid />
-                      <PolarAngleAxis dataKey="name" />
-                      <PolarRadiusAxis />
-                      <Radar name="Impact" dataKey="value" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
-                    </RadarChart>
+                  <PieChart>
+                     <Pie 
+                      data={processDataForCharts(data.affectedCrops)} 
+                      dataKey="value" 
+                      nameKey="name" 
+                      outerRadius={100} 
+                      fill="#8884d8"
+                    />
+                    <Tooltip />
+                  </PieChart>
                   </ResponsiveContainer>
                 </Card.Body>
               </Card>

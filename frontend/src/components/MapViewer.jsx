@@ -1,45 +1,68 @@
 import React, { useState } from 'react';
-import { MapContainer, TileLayer, GeoJSON, LayersControl } from 'react-leaflet';
-import { Alert, Spinner, Form, ListGroup } from 'react-bootstrap';
+import { MapContainer, TileLayer, WMSTileLayer } from 'react-leaflet';
+import { Form, ListGroup } from 'react-bootstrap';
 import 'leaflet/dist/leaflet.css';
-
-const { BaseLayer } = LayersControl;
 
 const MapViewer = () => {
   const position = [4.6818, 34.9911];
   const zoom = 5;
- 
-  // ==============================================
-  // GeoServer WMS Configuration (to be integrated later)
-  // ==============================================
-  /*
-  const geoServerBaseURL = 'http://localhost:8080/geoserver/floodwatch/wms?';
-  const commonParams = 'service=WMS&version=1.1.0&request=GetMap&format=image/png';
-  
-  const layerURLs = {
-    affectedPop: `${geoServerBaseURL}${commonParams}&layers=floodwatch:Impact_affectedpop`,
-    affectedGDP: `${geoServerBaseURL}${commonParams}&layers=floodwatch:Impact_affectedgdp`,
-    affectedCrops: `${geoServerBaseURL}${commonParams}&layers=floodwatch:Impact_affectedcrops`,
-    affectedRoads: `${geoServerBaseURL}${commonParams}&layers=floodwatch:Impact_affectedroads`,
-    displacedPop: `${geoServerBaseURL}${commonParams}&layers=floodwatch:Impact_displacedpop`,
-    affectedLivestock: `${geoServerBaseURL}${commonParams}&layers=floodwatch:Impact_affectedlivestock`,
-    affectedGrazingLand: `${geoServerBaseURL}${commonParams}&layers=floodwatch:Impact_affectedgrazinglands`,
-  };
-  */
 
-  // ==============================================
-  // REST API Configuration
-  // ==============================================
-  const layerURLs = {
-    affectedPop: 'http://127.0.0.1:8000/api/affectedPop/',
-    affectedGDP: 'http://127.0.0.1:8000/api/affectedGDP/',
-    affectedCrops: 'http://127.0.0.1:8000/api/affectedCrops/',
-    affectedRoads: 'http://127.0.0.1:8000/api/affectedRoads/',
-    displacedPop: 'http://127.0.0.1:8000/api/displacedPop/',
-    affectedLivestock: 'http://127.0.0.1:8000/api/affectedLivestock/',
-    affectedGrazingLand: 'http://127.0.0.1:8000/api/affectedGrazingLand/',
-  };
+  const geoserverWMSUrl = "http://localhost:8080/geoserver/floodwatch/wms";
 
+  // Impact Layers Configuration
+  const impactLayers = [
+    {
+      name: 'Affected Population',
+      layer: 'floodwatch:Impact_affectedpopulation',
+      legend: `${geoserverWMSUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=floodwatch:Impact_affectedpopulation`,
+    },
+    {
+      name: 'Affected GDP',
+      layer: 'floodwatch:Impact_impactedgdp',
+      legend: `${geoserverWMSUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=floodwatch:Impact_impactedgdp`,
+    },
+    {
+      name: 'Affected Crops',
+      layer: 'floodwatch:Impact_affectedcrops',
+      legend: `${geoserverWMSUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=floodwatch:Impact_affectedcrops`,
+    },
+    {
+      name: 'Affected Roads',
+      layer: 'floodwatch:Impact_affectedroads',
+      legend: `${geoserverWMSUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=floodwatch:Impact_affectedroads`,
+    },
+    {
+      name: 'Displaced Population',
+      layer: 'floodwatch:Impact_displacedpopulation',
+      legend: `${geoserverWMSUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=floodwatch:Impact_displacedpopulation`,
+    },
+    {
+      name: 'Affected Livestock',
+      layer: 'floodwatch:Impact_affectedlivestock',
+      legend: `${geoserverWMSUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=floodwatch:Impact_affectedlivestock`,
+    },
+    {
+      name: 'Affected Grazing Land',
+      layer: 'floodwatch:Impact_affectedgrazingland',
+      legend: `${geoserverWMSUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=floodwatch:Impact_affectedgrazingland`,
+    },
+  ];
+
+  // Hazard and Alerts Configuration
+  const hazardAndAlertLayers = [
+    {
+      name: 'Flood Hazard Map',
+      layer: 'floodwatch:flood_hazard_map_floodproofs_202501030000',
+      legend: `${geoserverWMSUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=floodwatch:flood_hazard_map_floodproofs_202501030000`,
+    },
+    {
+      name: 'Flood Alerts',
+      layer: 'floodwatch:Alerts',
+      legend: `${geoserverWMSUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=floodwatch:Alerts`,
+    },
+  ];
+
+  // Base Maps Configuration
   const basemaps = [
     {
       name: 'OpenStreetMap',
@@ -58,84 +81,99 @@ const MapViewer = () => {
     },
   ];
 
+  /* REST API Configuration 
+  const restApiEndpoints = {
+    affectedPop: 'http://127.0.0.1:8000/api/affectedPop/',
+    affectedGDP: 'http://127.0.0.1:8000/api/affectedGDP/',
+    affectedCrops: 'http://127.0.0.1:8000/api/affectedCrops/',
+    affectedRoads: 'http://127.0.0.1:8000/api/affectedRoads/',
+    displacedPop: 'http://127.0.0.1:8000/api/displacedPop/',
+    affectedLivestock: 'http://127.0.0.1:8000/api/affectedLivestock/',
+    affectedGrazingLand: 'http://127.0.0.1:8000/api/affectedGrazingLand/',
+  };
+  */
+
   const [selectedLayer, setSelectedLayer] = useState(null);
-  const [loadingLayer, setLoadingLayer] = useState(null);
-  const [error, setError] = useState(null);
+  const [activeLegend, setActiveLegend] = useState(null);
+  const [baseMap, setBaseMap] = useState(basemaps[0]);
+  
 
-  // Styling for GeoJSON data
-  const breaks = [-1, 0, 5, 10, 20];
-  const getFloodColor = (flood_tot) => {
-    if (flood_tot < 0) return 'transparent';
-    if (flood_tot >= 20) return '#f86c31';
-    if (flood_tot >= 10) return '#fda649';
-    if (flood_tot >= 5) return '#fed66d';
-    if (flood_tot > 0) return '#ffffb2';
-    return 'transparent';
+  const handleLayerSelection = (layer) => {
+    // Clear current layer
+    setSelectedLayer(null);
+    
+    // Short timeout to ensure layer switch
+    setTimeout(() => {
+      setSelectedLayer(layer.layer);
+      setActiveLegend(layer.legend);
+    }, 100);
   };
 
-  const getGeoJsonStyle = (feature) => {
-    const flood_tot = feature.properties?.flood_tot || 0;
-    return {
-      fillColor: flood_tot <= 0 ? 'transparent' : getFloodColor(flood_tot),
-      fillOpacity: flood_tot <= 0 ? 0 : 0.7,
-      weight: 2,
-      color: 'black',
-    };
+  const handleBaseMapChange = (baseMapIndex) => {
+    setBaseMap(basemaps[baseMapIndex]);
   };
 
-  const fetchLayerData = async (layerKey) => {
+  /* REST API Implementation 
+  const fetchRestApiData = async (endpoint) => {
     try {
-      const response = await fetch(layerURLs[layerKey]);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const response = await fetch(endpoint);
+      if (!response.ok) throw new Error('Failed to fetch data');
       const data = await response.json();
-      if (!data || typeof data !== 'object') throw new Error('Invalid data received');
       return data;
     } catch (error) {
-      throw new Error(`Failed to fetch ${layerKey}: ${error.message}`);
+      console.error('Error fetching REST API data:', error);
+      return null;
     }
   };
-
-  const handleLayerToggle = async (layerKey) => {
-    if (selectedLayer === layerKey) {
-      setSelectedLayer(null);
-    } else {
-      setLoadingLayer(layerKey);
-      setError(null);
-
-      try {
-        const data = await fetchLayerData(layerKey);
-        setSelectedLayer({ key: layerKey, data });
-      } catch (error) {
-        setError(`Failed to load ${layerKey}: ${error.message}`);
-      } finally {
-        setLoadingLayer(null);
-      }
-    }
-  };
+  */
 
   return (
     <div className="app-container">
       <div className="sidebar">
-        <h4>Layers</h4>
-        {error && (
-          <Alert variant="danger" className="mb-3">
-            {error}
-          </Alert>
-        )}
-        <ListGroup>
-          {Object.keys(layerURLs).map((key) => (
-            <ListGroup.Item key={key}>
+        {/* Impact Layers Section */}
+        <h4>Impact Layers</h4>
+        <ListGroup className="mb-4">
+          {impactLayers.map((layer) => (
+            <ListGroup.Item key={layer.name}>
               <Form.Check
                 type="radio"
-                name="layer"
-                label={key}
-                checked={selectedLayer?.key === key}
-                onChange={() => handleLayerToggle(key)}
-                disabled={loadingLayer === key}
+                name="layerSelection"
+                label={layer.name}
+                onChange={() => handleLayerSelection(layer)}
+                checked={selectedLayer === layer.layer}
               />
-              {loadingLayer === key && (
-                <Spinner animation="border" size="sm" className="ms-2" />
-              )}
+            </ListGroup.Item>
+          ))}
+        </ListGroup>
+
+        {/* Hazard and Alert Layers Section */}
+        <h4>Hazard & Alert Maps</h4>
+        <ListGroup className="mb-4">
+          {hazardAndAlertLayers.map((layer) => (
+            <ListGroup.Item key={layer.name}>
+              <Form.Check
+                type="radio"
+                name="layerSelection"
+                label={layer.name}
+                onChange={() => handleLayerSelection(layer)}
+                checked={selectedLayer === layer.layer}
+              />
+            </ListGroup.Item>
+          ))}
+        </ListGroup>
+
+        {/* Base Maps Section */}
+        <h4>Base Maps</h4>
+        <ListGroup>
+          {basemaps.map((basemap, index) => (
+            <ListGroup.Item key={basemap.name}>
+              <Form.Check
+                type="radio"
+                name="basemapSelection"
+                label={basemap.name}
+                onChange={() => handleBaseMapChange(index)}
+                checked={baseMap === basemap}
+              />
             </ListGroup.Item>
           ))}
         </ListGroup>
@@ -148,31 +186,37 @@ const MapViewer = () => {
           scrollWheelZoom={true}
           style={{ height: '100%', width: '100%' }}
         >
-          <LayersControl position="topright">
-            {basemaps.map((basemap, index) => (
-              <BaseLayer key={index} name={basemap.name} checked={index === 0}>
-                <TileLayer url={basemap.url} attribution={basemap.attribution} />
-              </BaseLayer>
-            ))}
-          </LayersControl>
-          
+          <TileLayer url={baseMap.url} attribution={baseMap.attribution} />
+
           {selectedLayer && (
-            <GeoJSON
-              data={selectedLayer.data}
-              style={getGeoJsonStyle}
-              onEachFeature={(feature, layer) => {
-                if (feature.properties) {
-                  layer.bindPopup(`
-                    <div>
-                      <h4>${selectedLayer.key}</h4>
-                      <pre>${JSON.stringify(feature.properties, null, 2)}</pre>
-                    </div>
-                  `);
-                }
-              }}
+            <WMSTileLayer
+              key={selectedLayer}
+              url={geoserverWMSUrl}
+              layers={selectedLayer}
+              format="image/png"
+              transparent={true}
+              attribution="GeoServer Floodwatch"
             />
           )}
         </MapContainer>
+
+        {activeLegend && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '20px',
+              left: '20px',
+              background: 'white',
+              padding: '10px',
+              borderRadius: '8px',
+              boxShadow: '0px 0px 10px rgba(0,0,0,0.3)',
+              zIndex: 1000,
+            }}
+          >
+            <h5>Legend</h5>
+            <img src={activeLegend} alt="Legend" style={{ width: '100%' }} />
+          </div>
+        )}
       </div>
     </div>
   );

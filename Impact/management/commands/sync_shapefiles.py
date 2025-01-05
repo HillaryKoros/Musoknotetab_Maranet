@@ -23,13 +23,13 @@ class Command(BaseCommand):
     
     # Dynamically generate filenames based on the current date
     model_configurations = {
-        AffectedPopulation: f'202501020000_FPimpacts-Population.shp',
-        ImpactedGDP: f'202501020000_FPimpacts-GDP.shp',
-        AffectedCrops: f'202501020000_FPimpacts-Crops.shp',
-        AffectedRoads: f'202501020000_FPimpacts-KmRoads.shp',
-        DisplacedPopulation: f'202501020000_FPimpacts-Displaced.shp',
-        AffectedLivestock: f'202501020000_FPimpacts-Livestock.shp',
-        AffectedGrazingLand: f'202501020000_FPimpacts-Grazing.shp',
+        AffectedPopulation: f'202501030000_FPimpacts-Population.shp',
+        ImpactedGDP: f'202501030000_FPimpacts-GDP.shp',
+        AffectedCrops: f'202501030000_FPimpacts-Crops.shp',
+        AffectedRoads: f'202501030000_FPimpacts-KmRoads.shp',
+        DisplacedPopulation: f'202501030000_FPimpacts-Displaced.shp',
+        AffectedLivestock: f'202501030000_FPimpacts-Livestock.shp',
+        AffectedGrazingLand: f'202501030000_FPimpacts-Grazing.shp',
 }
     
     field_mapping = {
@@ -89,7 +89,7 @@ class Command(BaseCommand):
 
         # Construct the dynamic remote folder path
         # remote_folder = f"{remote_folder_base}/{year}/{month}/{day}/00"
-        remote_folder = f"{remote_folder_base}/2025/01/02/00"
+        remote_folder = f"{remote_folder_base}/2025/01/03/00"
         # Required shapefile extensions
         extensions = ['.shp', '.shx', '.dbf', '.prj']
         

@@ -64,28 +64,39 @@
 }
 
 
-/* Custom navbar header and footer */
 .navbar-custom {
   background-color: #115803; /* Solid green */
   border-bottom: 2px solid #228B22; /* Slightly darker green border */
+  height: 100px; /* Increase navbar height */
+  display: flex;
+  align-items: center; /* Center content vertically */
+  padding: 0 30px; /* Add horizontal padding */
 }
 
-.navbar-custom .navbar-brand,
-.navbar-custom .nav-link {
+.navbar-custom .navbar-brand {
+  font-size: 1.4rem; /* Larger brand text */
   color: black !important; /* Black text */
   font-weight: bold;
 }
 
-.navbar-custom .navbar-brand:hover,
-.navbar-custom .nav-link:hover {
-  color: #006400 !important; /* Dark green hover effect */
+.navbar-custom .nav-link {
+  font-size: 1.5rem; /* Larger nav link text */
+  color: black !important; /* Black text */
+  padding: 10px 15px; /* Increase link padding */
+  border-radius: 5px; /* Optional: Add rounded edges */
 }
 
-.footer-custom {
-  background-color: #115803; /* Solid green */
-  text-align: center;
-  color: black; /* Black text */
-  padding: 1rem;
-  border-top: 2px solid #228B22;
+.navbar-custom .nav-link:hover {
+  color: #006400 !important; /* Dark green hover effect */
+  background-color: rgba(0, 0, 0, 0.1); /* Optional: Add hover background */
+}
+
+.navbar-custom .nav-item {
+  margin: 0 40px; /* Add spacing between nav items */
+}
+
+.navbar-custom .navbar-toggler {
+  font-size: 1.5rem; /* Larger toggler icon  */
+  padding: 10px; /* Increase tappable area */
 }
 

@@ -11,10 +11,8 @@ from Impact.models import (
     AffectedGrazingLand
 )
 
- #
 # Get the current date in the required format
 current_date = datetime.now().strftime('%Y%m%d')
-
 
 class Command(BaseCommand):
     help = 'Sync remote shapefiles from SFTP and upload to database'
@@ -23,14 +21,14 @@ class Command(BaseCommand):
     
     # Dynamically generate filenames based on the current date
     model_configurations = {
-        AffectedPopulation: f'202501030000_FPimpacts-Population.shp',
-        ImpactedGDP: f'202501030000_FPimpacts-GDP.shp',
-        AffectedCrops: f'202501030000_FPimpacts-Crops.shp',
-        AffectedRoads: f'202501030000_FPimpacts-KmRoads.shp',
-        DisplacedPopulation: f'202501030000_FPimpacts-Displaced.shp',
-        AffectedLivestock: f'202501030000_FPimpacts-Livestock.shp',
-        AffectedGrazingLand: f'202501030000_FPimpacts-Grazing.shp',
-}
+        AffectedPopulation: f'{current_date}0000_FPimpacts-Population.shp',
+        ImpactedGDP: f'{current_date}0000_FPimpacts-GDP.shp',
+        AffectedCrops: f'{current_date}0000_FPimpacts-Crops.shp',
+        AffectedRoads: f'{current_date}0000_FPimpacts-KmRoads.shp',
+        DisplacedPopulation: f'{current_date}0000_FPimpacts-Displaced.shp',
+        AffectedLivestock: f'{current_date}0000_FPimpacts-Livestock.shp',
+        AffectedGrazingLand: f'{current_date}0000_FPimpacts-Grazing.shp',
+    }
     
     field_mapping = {
         'gid_0': 'GID_0',
@@ -81,15 +79,10 @@ class Command(BaseCommand):
         sftp_password = config('SFTP_PASSWORD')
         remote_folder_base = config('REMOTE_FOLDER_BASE')
         
-        # Get the current date
-        # current_date = datetime.now()
-        # year = current_date.strftime('%Y')-1
-        # month = current_date.strftime('%m')-1
-        # day = current_date.strftime('%d')-1
-
         # Construct the dynamic remote folder path
-        # remote_folder = f"{remote_folder_base}/{year}/{month}/{day}/00"
-        remote_folder = f"{remote_folder_base}/2025/01/03/00"
+        remote_date = datetime.now().strftime('%Y/%m/%d/00')
+        remote_folder = f"{remote_folder_base}/{remote_date}"
+        
         # Required shapefile extensions
         extensions = ['.shp', '.shx', '.dbf', '.prj']
         

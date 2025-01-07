@@ -1,6 +1,3 @@
-Here's the updated markdown with the included notes for Data Synchronization and Frontend Development:
-
-```markdown
 # Flood Watch System
 
 ## Table of Contents
@@ -86,5 +83,3 @@ python manage.py sync_shapefiles
 
 **Note:** _Additional details coming soon, the frontend is still under the initial stage of development._
 ```
-
-Let me know if any further modifications are needed!

@@ -54,8 +54,8 @@ const IMPACT_LAYERS = [
 
 // Hazard and alert layer definitions
 const HAZARD_ALERT_LAYERS = [
-  createWMSLayer('Flood Hazard Map', 'flood_hazard_map_floodproofs_202501030000'),
-  createWMSLayer('Flood Alerts', 'Alerts')
+  createWMSLayer('Inundation Map', 'flood_hazard_map_floodproofs_202501030000'),
+  createWMSLayer('Alerts Map', 'Alerts')
 ];
 
 // Base map definitions

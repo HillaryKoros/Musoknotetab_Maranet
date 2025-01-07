@@ -77,12 +77,15 @@ services:
   frontend:
     build:
       context: ./frontend
-      target: production
+      target: development
     ports:
       - "5173:80"
     environment:
-      - NODE_ENV=production
-      - VITE_API_URL=http://localhost:8000  # Changed to use localhost since this will be accessed from browser
+      - NODE_ENV=development  # Ensure it runs in development mode for hot-reloading
+      - VITE_API_URL=http://localhost:8000  # Backend API URL
+    volumes:
+      - ./frontend:/usr/src/app  # Mount local frontend files for hot-reloading
+    command: npm run dev  # Run the development server for hot-reloading
     depends_on:
       - web
     networks:

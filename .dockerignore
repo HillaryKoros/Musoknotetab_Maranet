@@ -7,7 +7,7 @@ __pycache__/
 *.venv
 venv/
 .env
-
+./backend/webdev-env/
 # Django-specific files
 db.sqlite3
 media/

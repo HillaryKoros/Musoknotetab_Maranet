@@ -11,8 +11,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-# Stage 3: Production
-FROM nginx:alpine AS production
+# Stage 3: Development
+FROM nginx:alpine AS development
 # Copy the built files from the builder stage to Nginx's html directory
 COPY --from=builder /app/dist /usr/share/nginx/html
 # Copy custom Nginx configuration file

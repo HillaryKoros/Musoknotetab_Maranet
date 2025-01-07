@@ -231,7 +231,7 @@ const MapViewer = () => {
         />
         
         <LayerSelector
-          title="Hazard & Alert Maps"
+          title="Inundation & Alert Maps"
           layers={HAZARD_ALERT_LAYERS}
           selectedLayer={selectedLayer}
           onLayerSelect={handleLayerSelection}

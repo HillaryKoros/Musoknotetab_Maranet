@@ -11,8 +11,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DB_HOST=db  # Changed from localhost to db service name
-      - DB_PORT=5432  # Changed to match Postgres default port
+      - DB_HOST=db
+      - DB_PORT=5432
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
@@ -77,15 +77,15 @@ services:
   frontend:
     build:
       context: ./frontend
-      target: development
+      dockerfile: Dockerfile
+      target: production  # Use production target by default for serving static files
     ports:
-      - "5173:80"
+      - "5173:80"  # Frontend production port exposed via nginx
     environment:
-      - NODE_ENV=development  # Ensure it runs in development mode for hot-reloading
+      - NODE_ENV=production  # Set to production mode in the container
       - VITE_API_URL=http://localhost:8000  # Backend API URL
     volumes:
-      - ./frontend:/usr/src/app  # Mount local frontend files for hot-reloading
-    command: npm run dev  # Run the development server for hot-reloading
+      - ./frontend:/app  # Mount the frontend directory for development mode
     depends_on:
       - web
     networks:

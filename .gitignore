@@ -7,7 +7,7 @@
 *. __pycache__/
 
 # Ignore Django migrations
-*.migrations/*
+*./backend/migrations/*
 
 # Ignore media files
 media/

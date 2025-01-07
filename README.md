@@ -1,85 +1,92 @@
 # Flood Watch System
 
 ## Table of Contents
-- [Introduction](#Introduction)
-- [Getting Started](#GettingStarted)
-- [Build and Test](#BuildandTest)
-- [Data Synchronization](#DataSynchronization)
-- [Frontend Development](#frontend-development)
+- [Introduction](#introduction)
+- [Getting Started](#getting-started)
+- [Build and Test](#build-and-test)
+- [Data Synchronization](#data-synchronization)
 
-# Introduction
-Django-based backend designed for flood_watch_system. 
+## Introduction
+A comprehensive system for flood monitoring and reporting, featuring a Django-based backend and a React-based frontend.
 
 ![Screenshot](capture.PNG)
 
-# Getting Started
-### Prerequisites
-Ensure the following are installed on your system:
-- Python 3.9+
-- PostgreSQL with PostGIS extension
-- Git and GitHub access
-- GeoDjango dependencies (`GDAL`, `GEOS`, `PROJ`)
-- GeoServer
+---
 
-# Build and Test
-1. Clone the repository:
-    ```bash
-    git clone https://github.com/icpac-igad/flood_watch_system.git
-    cd flood_watch_system
-    ```
+## Getting Started
 
-2. Set up a virtual environment:
-    - **Windows:**
-      ```bash
-      python -m venv env
-      env\Scripts\activate
-      ```
-    - **Linux/macOS:**
-      ```bash
-      python3 -m venv env
-      source env/bin/activate
-      ```
+1. Ensure you have a `.env` file in the root directory with the following environment variables:
+   ```plaintext
+   DB_HOST=db
+   DB_PORT=5432
+   DB_USER=your_db_user
+   DB_PASSWORD=your_db_password
+   DB_NAME=your_db_name
+   SECRET_KEY=your_secret_key
+   DEBUG=1
+   DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+   CORS_ALLOWED_ORIGINS=True
+   CORS_ORIGIN_WHITELIST=http://localhost:5173
+   API_VERSION=v1
+   REDIS_HOST=redis
+   REDIS_PORT=6379
+   REMOTE_FOLDER_BASE=your_remote_folder_base
+   SFTP_HOST=your_sftp_host
+   SFTP_PORT=your_sftp_port
+   SFTP_USERNAME=your_sftp_username
+   SFTP_PASSWORD=your_sftp_password
+   ```
 
-3. Install dependencies:
-    ```bash
-    pip install -r requirements.txt
-    ```
+2. Navigate to the `backend` directory and set up a virtual environment:
+   - **Windows:**
+     ```bash
+     python -m venv env
+     env\Scripts\activate
+     ```
+   - **Linux/macOS:**
+     ```bash
+     python3 -m venv env
+     source env/bin/activate
+     ```
 
-4. Configure environment variables:
-    Create a `.env` file in the root directory and add your configuration:
-    ```plaintext
-    SECRET_KEY=your_secret_key
-    DATABASE_URL=postgres://user:password@localhost:5432/flood_watch
-    ```
+3. Install the required Python dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-5. Install required system libraries (e.g., for GeoDjango):
-    - **Linux (Ubuntu/Debian):**
-      ```bash
-      sudo apt install gdal-bin libgdal-dev libproj-dev
-      ```
-    - **Windows:**  
-      On Windows, you may need to manually install the required libraries, such as GDAL, by following the instructions on the [GeoDjango installation guide](https://docs.djangoproject.com/en/stable/ref/contrib/gis/install/#gdal).
+4. Return to the main directory containing the `docker-compose.yml` file:
+   ```bash
+   cd ..
+   ```
 
-6. Run migrations:
-    ```bash
-    python manage.py makemigrations
-    python manage.py migrate
-    ```
+5. Build and start all services using Docker Compose:
+   ```bash
+   docker compose build --no-cache
+   docker compose up
+   ```
 
-7. Start the development server:
-    ```bash
-    python manage.py runserver
-    ```
+---
 
-# Data Synchronization
-To synchronize data from the floodPROOFS model output server, ensure the remote server credentials are configured in the `.env` file, then run:
+## Build and Test
+
+1. Use the `docker compose` command to build and start all services:
+   ```bash
+   docker compose build --no-cache
+   docker compose up
+   ```
+
+2. Access the application:
+   - Backend API: [http://localhost:8000](http://localhost:8000)
+   - Frontend: [http://localhost:5173](http://localhost:5173)
+
+---
+
+## Data Synchronization
+
+To synchronize data from the floodPROOFS model output server, ensure the remote server credentials are configured in the `.env` file, then run the following command inside the `web` container:
 ```bash
-python manage.py sync_shapefiles
+docker exec -it <container_name> python manage.py sync_shapefiles
 ```
 
-**Note:** _Data synchronization is currently under development and may experience bugs when pushing to PostgreSQL._
-
-# Frontend Development
-
-**Note:** _Additional details coming soon, the frontend is still under the initial stage of development._
+---
 ```

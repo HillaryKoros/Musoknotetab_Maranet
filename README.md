@@ -1,17 +1,19 @@
-# Flood Watch System
+Here's the updated markdown with the included notes for Data Synchronization and Frontend Development:
 
+```markdown
+# Flood Watch System
 
 ## Table of Contents
 - [Introduction](#Introduction)
 - [Getting Started](#GettingStarted)
-- [ Build and Test](#BuildandTest)
+- [Build and Test](#BuildandTest)
 - [Data Synchronization](#DataSynchronization)
 - [Frontend Development](#frontend-development)
-   
-# Introduction
- Django-based backend designed for flood_watch_system. 
 
- ![Screenshot](capture.PNG)
+# Introduction
+Django-based backend designed for flood_watch_system. 
+
+![Screenshot](capture.PNG)
 
 # Getting Started
 ### Prerequisites
@@ -78,9 +80,11 @@ To synchronize data from the floodPROOFS model output server, ensure the remote 
 python manage.py sync_shapefiles
 ```
 
-**Note:**: _Data synchronization is currently under development and may experience bugs when pushing to PostgreSQL._
-
+**Note:** _Data synchronization is currently under development and may experience bugs when pushing to PostgreSQL._
 
 # Frontend Development
 
-**Note:**: _Additional details coming soon, the frontend is still under initial stage of development._
+**Note:** _Additional details coming soon, the frontend is still under the initial stage of development._
+```
+
+Let me know if any further modifications are needed!

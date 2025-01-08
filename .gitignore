@@ -1,13 +1,13 @@
 # Ignore environment variables
 .env
-./backend/webdev-env/
+.webdev_env
 
 # Ignore compiled files
 *.pyc
 *. __pycache__/
 
 # Ignore Django migrations
-*./backend/migrations/*
+*.migrations/*
 
 # Ignore media files
 media/

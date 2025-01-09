@@ -143,22 +143,29 @@ class AffectedGrazingLand(models.Model):
         verbose_name_plural = "AffectedGrazingLand"
 
 
-# # 8. Create a model named raster_data that has the following fields:
+# 8. Create a model named SectorData that has the following fields:
 
-# class RasterData(models.Model):
-#     gid_0 = models.CharField(max_length=80)
-#     name_0 = models.CharField(max_length=80)
-#     name_1 = models.CharField(max_length=80)
-#     engtype_1 = models.CharField(max_length=80)
-#     lack_cc = models.FloatField()
-#     cod = models.CharField(max_length=80)
-#     stock = models.FloatField()
-#     flood_tot = models.FloatField()
-#     flood_perc = models.FloatField()
-#     geom = models.MultiPolygonField(srid=4326)
-    
-#     def __unicode__(self):
-#         return self.name_1
-    
-#     class Meta:
-#         verbose_name_plural = "RasterData"
+class SectorData(models.Model):
+    sec_code = models.BigIntegerField()
+    sec_name = models.CharField(max_length=80)
+    basin = models.CharField(max_length=80)
+    domain = models.CharField(max_length=80)
+    admin_b_l1 = models.CharField(max_length=80)
+    admin_b_l2 = models.CharField(max_length=80, null=True)  # Allow null
+    admin_b_l3 = models.CharField(max_length=80, null=True)  # Allow null
+    sec_rs = models.CharField(max_length=80)
+    area = models.FloatField(null=False)
+    lat = models.FloatField(null=False)
+    lon = models.FloatField(null=False)
+    q_thr1 = models.FloatField(null=False)
+    q_thr2 = models.FloatField(null=False)
+    q_thr3 = models.FloatField(null=False)
+    cat = models.FloatField(null=True)
+    id = models.BigIntegerField(primary_key=True)
+    geom = models.PointField()
+
+    def __unicode__(self):
+        return self.sec_name
+
+    class Meta:
+        verbose_name_plural = "SectorData"

@@ -20,6 +20,9 @@ media/
 .DS_Store
 Thumbs.db
 
+#ignore .data folder across all directories
+*/.data*
+
 # Logs
 logs
 *.log

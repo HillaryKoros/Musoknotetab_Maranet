@@ -1,10 +1,11 @@
 import os
 from django.core.management.base import BaseCommand
 from django.contrib.gis.utils import LayerMapping
-from Impact.models import SectorData  # Import your SectorData model
+from django.conf import settings
+from Impact.models import SectorData
 
-# Field mapping for the shapefile and model fields
-FIELD_MAPPING = {
+# Define the mapping between model fields and shapefile attributes
+MAPPING = {
     'sec_code': 'SEC_CODE',
     'sec_name': 'SEC_NAME',
     'basin': 'BASIN',
@@ -21,34 +22,72 @@ FIELD_MAPPING = {
     'q_thr3': 'Q_THR3',
     'cat': 'cat',
     'id': 'ID',
-    'geom': 'POINT'
+    'geom': 'POINT',
 }
 
 class Command(BaseCommand):
-    help = 'Upload shapefile to the SectorData model'
+    help = 'Synchronizes sector data from shapefiles into the database'
 
-    def handle(self, *args, **kwargs):
-        shapefile_path = './data/fp_sections_igad.shp'  # Local shapefile path
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--shapefile-path',
+            type=str,
+            default='data/fp_sections_igad.shp',
+            help='Path to the shapefile relative to project root'
+        )
+        parser.add_argument(
+            '--clear',
+            action='store_true',
+            help='Clear existing data before importing'
+        )
 
-        if not os.path.exists(shapefile_path):
-            self.stderr.write(self.style.ERROR(f"Shapefile not found at {shapefile_path}"))
+    def handle(self, *args, **options):
+        shapefile_path = options['shapefile_path']
+        clear_existing = options['clear']
+
+        # Construct absolute path
+        abs_path = os.path.join(settings.BASE_DIR, shapefile_path)
+
+        if not os.path.exists(abs_path):
+            self.stderr.write(
+                self.style.ERROR(f'Shapefile not found at: {abs_path}')
+            )
             return
 
-        self.stdout.write(f"Loading shapefile {shapefile_path}...")
-
-        # Initialize LayerMapping to upload the shapefile
         try:
+            # Clear existing data if requested
+            if clear_existing:
+                self.stdout.write('Clearing existing sector data...')
+                SectorData.objects.all().delete()
+
+            # Initialize the LayerMapping
             lm = LayerMapping(
-                SectorData,           # The model
-                shapefile_path,       # Path to the shapefile
-                FIELD_MAPPING,        # Field mapping dictionary
-                transform=False,      # Set to True if you need to transform coordinates
-                encoding='utf-8'      # Ensure encoding is correct for your shapefile
+                model=SectorData,
+                data=abs_path,
+                mapping=MAPPING,
+                transform=False,  # Set to True if coordinate transformation is needed
+                encoding='utf-8'
             )
 
-            # Save the shapefile data into the database
-            lm.save(strict=True, verbose=True)
-            self.stdout.write(self.style.SUCCESS("Shapefile successfully uploaded to the database!"))
-        
+            self.stdout.write('Starting shapefile import...')
+            
+            # Perform the import
+            lm.save(
+                strict=True,  # Raise exceptions for invalid data
+                verbose=True,
+                progress=True
+            )
+
+            # Count imported records
+            record_count = SectorData.objects.count()
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f'Successfully imported {record_count} records from shapefile'
+                )
+            )
+
         except Exception as e:
-            self.stderr.write(self.style.ERROR(f"Error uploading shapefile: {str(e)}"))
+            self.stderr.write(
+                self.style.ERROR(f'Error during import: {str(e)}')
+            )
+            raise

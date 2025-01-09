@@ -19,10 +19,9 @@ WORKDIR /app
 
 # Copy application files
 COPY . /app/
-
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy the requirements.txt file and install dependencies
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \

@@ -49,7 +49,8 @@ const IMPACT_LAYERS = [
   createWMSLayer('Affected Roads', 'Impact_affectedroads'),
   createWMSLayer('Displaced Population', 'Impact_displacedpopulation'),
   createWMSLayer('Affected Livestock', 'Impact_affectedlivestock'),
-  createWMSLayer('Affected Grazing Land', 'Impact_affectedgrazingland')
+  createWMSLayer('Affected Grazing Land', 'Impact_affectedgrazingland'),
+  createWMSLayer('SectorData', 'Impact_sectordata')
 ];
 
 // Hazard and alert layer definitions

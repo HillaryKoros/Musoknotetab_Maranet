@@ -2,7 +2,7 @@ from django.contrib import admin
 from leaflet.admin import LeafletGeoAdmin
 from .models import (
     AffectedGrazingLand, AffectedPopulation, ImpactedGDP, AffectedCrops,
-    AffectedLivestock, AffectedRoads, DisplacedPopulation
+    AffectedLivestock, AffectedRoads, DisplacedPopulation,SectorData
 )
 
 class BaseImpactAdmin(LeafletGeoAdmin):
@@ -19,7 +19,8 @@ class BaseImpactAdmin(LeafletGeoAdmin):
     )
     search_fields = ('name_0', 'name_1', 'cod')
     list_filter = ('name_0', 'engtype_1')
-    
+
+ 
     # # Leaflet settings
     # settings_overrides = {
     #     'DEFAULT_CENTER': (0.0, 36.0),  # Centered on East Africa
@@ -55,3 +56,9 @@ class AffectedRoadsAdmin(BaseImpactAdmin):
 @admin.register(DisplacedPopulation)
 class DisplacedPopulationAdmin(BaseImpactAdmin):
     pass
+
+@admin.register(SectorData)
+class SectorDataAdmin(LeafletGeoAdmin):
+    list_display = ('id', 'sec_code', 'sec_name', 'basin', 'domain', 'admin_b_l1', 'area', 'lat', 'lon')
+    search_fields = ('sec_name', 'basin', 'domain')
+    list_filter = ('basin', 'domain')

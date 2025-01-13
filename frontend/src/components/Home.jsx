@@ -28,7 +28,7 @@ const Home = () => {
     <Container className="py-5">
       <Row className="mb-5">
         <Col>
-          <h1 className="text-center mb-4">East Africa Flood Watch</h1>
+          <h1 className="text-center mb-4">EAFW</h1>
           <p className="text-center lead">
             Explore, analyze, and visualize flood related data and impact based forecasted outputs for East Africa
           </p>

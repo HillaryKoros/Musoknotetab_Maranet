@@ -4,11 +4,11 @@ from rest_framework import viewsets
 from .serializers import (
     AffectedPopulationSerializer, ImpactedGDPSerializer, AffectedCropsSerializer,
     AffectedRoadsSerializer, DisplacedPopulationSerializer, AffectedLivestockSerializer,
-    AffectedGrazingLandSerializer
+    AffectedGrazingLandSerializer, SectorDataSerializer
 )
 from .models import (
     AffectedPopulation, ImpactedGDP, AffectedCrops, AffectedGrazingLand,
-    AffectedLivestock, AffectedRoads, DisplacedPopulation
+    AffectedLivestock, AffectedRoads, DisplacedPopulation, SectorData
 )
 
 @extend_schema(tags=['affected-population'])
@@ -52,3 +52,10 @@ class AffectedGrazingLandViewSet(viewsets.ModelViewSet):
     schema = AutoSchema()
     queryset = AffectedGrazingLand.objects.all()
     serializer_class = AffectedGrazingLandSerializer
+
+
+@extend_schema(tags=['sector-data'])
+class SectorDataViewSet(viewsets.ModelViewSet):
+    schema = AutoSchema()
+    queryset = SectorData.objects.all()
+    serializer_class = SectorDataSerializer

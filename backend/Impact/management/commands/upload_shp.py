@@ -1,38 +1,30 @@
 import os
 from django.core.management.base import BaseCommand
 from django.contrib.gis.utils import LayerMapping
+from django.contrib.gis.gdal import DataSource
 from django.conf import settings
-from Impact.models import SectorData
+from django.db import transaction
+from Impact.models import WaterBody
 
-# Define the mapping between model fields and shapefile attributes
 MAPPING = {
-    'sec_code': 'SEC_CODE',
-    'sec_name': 'SEC_NAME',
-    'basin': 'BASIN',
-    'domain': 'DOMAIN',
-    'admin_b_l1': 'ADMIN_B_L1',
-    'admin_b_l2': 'ADMIN_B_L2',
-    'admin_b_l3': 'ADMIN_B_L3',
-    'sec_rs': 'SEC_RS',
-    'area': 'AREA',
-    'lat': 'LAT',
-    'lon': 'LON',
-    'q_thr1': 'Q_THR1',
-    'q_thr2': 'Q_THR2',
-    'q_thr3': 'Q_THR3',
-    'cat': 'cat',
-    'id': 'ID',
-    'geom': 'POINT',
+    'fid': 'fid',
+    'af_wtr_id': 'AF_WTR_ID',
+    'sqkm': 'SQKM',
+    'name_of_wa': 'NAME_OF_WA',
+    'type_of_wa': 'TYPE_OF_WA',
+    'shape_area': 'Shape_area',
+    'shape_len': 'Shape_len',
+    'geom': 'GEOMETRY',  
 }
 
 class Command(BaseCommand):
-    help = 'Synchronizes sector data from shapefiles into the database'
+    help = 'Synchronizes water body data from shapefiles into the database'
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--shapefile-path',
             type=str,
-            default='data/fp_sections_igad.shp',
+            default='data/water_bodies.shp',
             help='Path to the shapefile relative to project root'
         )
         parser.add_argument(
@@ -44,6 +36,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         shapefile_path = options['shapefile_path']
         clear_existing = options['clear']
+        successful_imports = 0
 
         # Construct absolute path
         abs_path = os.path.join(settings.BASE_DIR, shapefile_path)
@@ -54,40 +47,48 @@ class Command(BaseCommand):
             )
             return
 
-        try:
-            # Clear existing data if requested
-            if clear_existing:
-                self.stdout.write('Clearing existing sector data...')
-                SectorData.objects.all().delete()
+        # Clear existing data if requested
+        if clear_existing:
+            self.stdout.write('Clearing existing water body data...')
+            WaterBody.objects.all().delete()
 
-            # Initialize the LayerMapping
-            lm = LayerMapping(
-                model=SectorData,
-                data=abs_path,
-                mapping=MAPPING,
-                transform=False,  # Set to True if coordinate transformation is needed
-                encoding='utf-8'
-            )
+        # Open the shapefile
+        ds = DataSource(abs_path)
+        layer = ds[0]
 
-            self.stdout.write('Starting shapefile import...')
-            
-            # Perform the import
-            lm.save(
-                strict=True,  # Raise exceptions for invalid data
-                verbose=True,
-                progress=True
-            )
+        self.stdout.write('Starting shapefile import...')
 
-            # Count imported records
-            record_count = SectorData.objects.count()
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f'Successfully imported {record_count} records from shapefile'
+        # Import features one by one
+        for feature in layer:
+            try:
+                with transaction.atomic():
+                    water_body = WaterBody(
+                        fid=feature.get('fid'),
+                        af_wtr_id=feature.get('AF_WTR_ID'),
+                        sqkm=feature.get('SQKM'),
+                        name_of_wa=feature.get('NAME_OF_WA'),
+                        type_of_wa=feature.get('TYPE_OF_WA'),
+                        shape_area=feature.get('Shape_area'),
+                        shape_len=feature.get('Shape_len'),
+                        geom=feature.geom.wkt
+                    )
+                    water_body.save()
+                    successful_imports += 1
+                    self.stdout.write(f'Saved: WaterBody object ({successful_imports})')
+
+            except Exception as e:
+                self.stderr.write(
+                    self.style.WARNING(
+                        f'Failed to save feature into the model with the keyword arguments:\n'
+                        f'fid={feature.get("fid")}, '
+                        f'name={feature.get("NAME_OF_WA")}\n'
+                        f'Error: {str(e)}'
+                    )
                 )
-            )
+                continue
 
-        except Exception as e:
-            self.stderr.write(
-                self.style.ERROR(f'Error during import: {str(e)}')
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'Successfully imported {successful_imports} records from shapefile'
             )
-            raise
+        )

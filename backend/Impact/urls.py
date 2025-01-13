@@ -9,6 +9,7 @@ from .views import (
     DisplacedPopulationViewSet,
     AffectedLivestockViewSet,
     AffectedGrazingLandViewSet,
+    SectorDataViewSet,
 )
 
 # Create a router and register viewsets
@@ -33,6 +34,10 @@ router.register(r'displacedPop', DisplacedPopulationViewSet, basename='displaced
 router.register(r'affectedLivestock', AffectedLivestockViewSet, basename='affectedLivestock')
 # Registering the ViewSet for affected grazing land
 router.register(r'affectedGrazingLand', AffectedGrazingLandViewSet, basename='affectedGrazingLand')
+
+#  Registering the ViewSet for sector data
+router.register(r'sectorData', SectorDataViewSet, basename='sectorData')
+
 
 # URL patterns list for the Impact app. All URLs for the app will be handled by the viewsets registered above.
 urlpatterns = [

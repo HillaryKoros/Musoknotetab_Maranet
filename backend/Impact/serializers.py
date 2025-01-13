@@ -1,6 +1,6 @@
 from rest_framework_gis.serializers import GeoFeatureModelSerializer 
 
-from Impact.models import AffectedPopulation, ImpactedGDP, AffectedCrops, AffectedRoads, DisplacedPopulation, AffectedLivestock, AffectedGrazingLand
+from Impact.models import AffectedPopulation, ImpactedGDP, AffectedCrops, AffectedRoads, DisplacedPopulation, AffectedLivestock, AffectedGrazingLand, SectorData
 
 
 class AffectedPopulationSerializer(GeoFeatureModelSerializer):
@@ -52,5 +52,11 @@ class AffectedGrazingLandSerializer(GeoFeatureModelSerializer):
         geo_field = 'geom'
         fields = '__all__'
 
+
+class SectorDataSerializer(GeoFeatureModelSerializer):
+    class Meta:
+        model = SectorData
+        geo_field = 'geom'
+        fields = '__all__'
 
 

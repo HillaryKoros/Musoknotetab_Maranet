@@ -59,6 +59,20 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'leaflet',
     'Impact',
+    'taggit',
+    'django.contrib.sites',
+    'wagtail.contrib.forms',
+    'wagtail.contrib.redirects',
+    'wagtail.embeds',
+    'wagtail.sites',
+    'wagtail.users',
+    'wagtail.snippets',
+    'wagtail.documents',
+    'wagtail.images',
+    'wagtail.search',
+    'wagtail.admin',
+    'wagtail',
+    'modelcluster',
 ]
 
 MIDDLEWARE = [
@@ -69,7 +83,9 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'wagtail.contrib.redirects.middleware.RedirectMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    
 ]
 
 
@@ -77,6 +93,8 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",  #React development server
     "http://localhost:5173",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000"
 ]
 
 CORS_ALLOW_METHODS = [
@@ -93,6 +111,7 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
 ]
 
+WAGTAIL_SITE_NAME = 'flood_watch_system'
 
 ROOT_URLCONF = 'flood_watch_system.urls'
 
@@ -203,3 +222,8 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
 }
+
+
+WAGTAILADMIN_BASE_URL = 'http://localhost:8000'
+
+SITE_ID = 1

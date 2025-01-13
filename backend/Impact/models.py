@@ -169,3 +169,25 @@ class SectorData(models.Model):
 
     class Meta:
         verbose_name_plural = "SectorData"
+
+
+# 9.  Create a model named dams
+
+
+class WaterBody(models.Model):
+    fid = models.FloatField()
+    af_wtr_id = models.FloatField()
+    sqkm = models.FloatField()
+    name_of_wa = models.CharField(max_length=254, null=True, blank=True)  # Add both null and blank
+    type_of_wa = models.CharField(max_length=254)
+    shape_area = models.FloatField()
+    shape_len = models.FloatField()
+    geom = models.MultiPolygonField(srid=4326)
+
+
+    def __unicode__(self):
+        return self.name_of_wa
+
+    class Meta:
+        verbose_name_plural = "WaterBody"
+

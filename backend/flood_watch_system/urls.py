@@ -19,11 +19,14 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, Spec
 
 urlpatterns = [
     # Admin route: Access the Django admin panel
-    path('admin/', admin.site.urls),
+    path('admin/', admin.site.urls), 
+    
 
     # API routes: Includes all URLs from the 'Impact' app, which are handled by DRF ViewSets
     # This means the API routes for things like affected population, GDP, crops, etc. will be handled here.
     path('api/', include('Impact.urls')),
+
+    # path('', include('wagtail.urls')),  # Wagtail
 
     # API Schema generation routes (for API documentation tools): These routes are used to generate API documentation
     # SpectacularAPIView: This endpoint generates the OpenAPI schema for your API

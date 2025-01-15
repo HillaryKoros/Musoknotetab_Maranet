@@ -13,36 +13,11 @@ import os
 from decouple import config, Csv
 from pathlib import Path
 
-# to update next
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# # GDAL and GEOS library paths
-# GDAL_LIBRARY_PATH = r'C:\OSGeo4W\bin\gdal309.dll'
-# GEOS_LIBRARY_PATH = r'C:\OSGeo4W\bin\geos_c.dll'
-
-# GDAL_LIBRARY_PATH = os.getenv('GDAL_LIBRARY_PATH', '/usr/lib/x86_64-linux-gnu/gdal')
-# GEOS_LIBRARY_PATH = os.getenv('GEOS_LIBRARY_PATH', '/usr/lib/x86_64-linux-gnu/libgeos_c.so')
-
-
-# # # Set environment variables for GDAL and PROJ
-# os.environ['GDAL_DATA'] = r'C:\OSGeo4W\share\gdal'
-# os.environ['PROJ_LIB'] = r'C:\OSGeo4W\share\proj'
-
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY =config('SECRET_KEY')
-
-# SECURITY WARNING: don't run with debug turned on in production!
+SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
-
-ALLOWED_HOSTS =[]
-
-
-# Application definition
+ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -59,20 +34,19 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'leaflet',
     'Impact',
-    'taggit',
-    'django.contrib.sites',
-    'wagtail.contrib.forms',
-    'wagtail.contrib.redirects',
-    'wagtail.embeds',
-    'wagtail.sites',
-    'wagtail.users',
-    'wagtail.snippets',
-    'wagtail.documents',
-    'wagtail.images',
-    'wagtail.search',
-    'wagtail.admin',
-    'wagtail',
-    'modelcluster',
+    # 'django.contrib.sites',
+    # 'wagtail.contrib.forms',
+    # 'wagtail.contrib.redirects',
+    # 'wagtail.embeds',
+    # 'wagtail.sites',
+    # 'wagtail.users',
+    # 'wagtail.snippets',
+    # 'wagtail.documents',
+    # 'wagtail.images',
+    # 'wagtail.search',
+    # 'wagtail.admin',
+    # 'wagtail',
+    # 'modelcluster',
 ]
 
 MIDDLEWARE = [
@@ -83,13 +57,10 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'wagtail.contrib.redirects.middleware.RedirectMiddleware',
+    # 'wagtail.contrib.redirects.middleware.RedirectMiddleware',  # Wagtail middleware
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    
 ]
 
-
-# CORS settings
 CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",  #React development server
     "http://localhost:5173",
@@ -111,8 +82,6 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
 ]
 
-WAGTAIL_SITE_NAME = 'flood_watch_system'
-
 ROOT_URLCONF = 'flood_watch_system.urls'
 
 TEMPLATES = [
@@ -133,10 +102,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'flood_watch_system.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/4.1/ref/settings/#databases
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
@@ -147,10 +112,6 @@ DATABASES = {
         'PORT': config('DB_PORT'),
     }
 }
-
-
-# Password validation
-# https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -167,27 +128,13 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/4.1/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'Africa/Nairobi'
-
 USE_I18N = True
-
 USE_TZ = True
-
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.1/howto/static-files/
 
 STATIC_URL = 'static/'
 
-
-
-# Leaflet settings
 LEAFLET_CONFIG = {
     'DEFAULT_CENTER': (-1.286389, 36.817223),
     'DEFAULT_ZOOM': 3,
@@ -196,16 +143,9 @@ LEAFLET_CONFIG = {
     'SCALE': 'both',
     'ATTRIBUTION_PREFIX': 'IGAD-ICPAC'
 }
-# Default primary key field type
-# https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
-
-
-
-# REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -214,8 +154,6 @@ REST_FRAMEWORK = {
     ],
 }
 
-
-# Spectacular settings
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Flood Watch System API',
     'DESCRIPTION': 'API for managing flood impact data',
@@ -223,7 +161,6 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
-
-WAGTAILADMIN_BASE_URL = 'http://localhost:8000'
-
+# WAGTAILADMIN_BASE_URL = 'http://localhost:8000'
+# WAGTAIL_SITE_NAME = 'flood_watch_system'
 SITE_ID = 1

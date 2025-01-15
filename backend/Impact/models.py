@@ -144,15 +144,14 @@ class AffectedGrazingLand(models.Model):
 
 
 # 8. Create a model named SectorData that has the following fields:
-
 class SectorData(models.Model):
     sec_code = models.BigIntegerField()
     sec_name = models.CharField(max_length=80)
     basin = models.CharField(max_length=80)
     domain = models.CharField(max_length=80)
     admin_b_l1 = models.CharField(max_length=80)
-    admin_b_l2 = models.CharField(max_length=80, null=True)  # Allow null
-    admin_b_l3 = models.CharField(max_length=80, null=True)  # Allow null
+    admin_b_l2 = models.CharField(max_length=80, null=True)
+    admin_b_l3 = models.CharField(max_length=80, null=True)
     sec_rs = models.CharField(max_length=80)
     area = models.FloatField(null=False)
     lat = models.FloatField(null=False)
@@ -161,7 +160,7 @@ class SectorData(models.Model):
     q_thr2 = models.FloatField(null=False)
     q_thr3 = models.FloatField(null=False)
     cat = models.FloatField(null=True)
-    id = models.BigIntegerField(primary_key=True)
+    # id = models.BigIntegerField(primary_key=True)
     geom = models.PointField()
 
     def __unicode__(self):
@@ -171,23 +170,32 @@ class SectorData(models.Model):
         verbose_name_plural = "SectorData"
 
 
-# 9.  Create a model named dams
+# class TimeSeriesData(models.Model):
+#     sector = models.ForeignKey(SectorData, on_delete=models.CASCADE, related_name="time_series")
+#     timestamp = models.DateTimeField()
+#     value = models.FloatField()  # The time series value (e.g., discharge, etc.)
+#     source = models.CharField(max_length=50)  # E.g., "gfs", "icon", etc.
+
+#     class Meta:
+#         verbose_name_plural = "TimeSeriesData"
+#         unique_together = ('sector', 'timestamp', 'source')
 
 
-class WaterBody(models.Model):
-    fid = models.FloatField()
-    af_wtr_id = models.FloatField()
-    sqkm = models.FloatField()
-    name_of_wa = models.CharField(max_length=254, null=True, blank=True)  # Add both null and blank
-    type_of_wa = models.CharField(max_length=254)
-    shape_area = models.FloatField()
-    shape_len = models.FloatField()
-    geom = models.MultiPolygonField(srid=4326)
+# # 9.  Create a model named waterbody
+# class WaterBody(models.Model):
+#     fid = models.FloatField()
+#     af_wtr_id = models.FloatField()
+#     sqkm = models.FloatField()
+#     name_of_wa = models.CharField(max_length=254, null=True, blank=True)  # Add both null and blank
+#     type_of_wa = models.CharField(max_length=254)
+#     shape_area = models.FloatField()
+#     shape_len = models.FloatField()
+#     geom = models.MultiPolygonField(srid=4326)
 
 
-    def __unicode__(self):
-        return self.name_of_wa
+#     def __unicode__(self):
+#         return self.name_of_wa
 
-    class Meta:
-        verbose_name_plural = "WaterBody"
+#     class Meta:
+#         verbose_name_plural = "WaterBody"
 

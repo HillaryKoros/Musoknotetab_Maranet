@@ -2,24 +2,25 @@ import os
 from io import BytesIO
 import paramiko
 from datetime import datetime
+import geopandas as gpd
+import pandas as pd
 from django.core.management.base import BaseCommand
 from django.contrib.gis.utils import LayerMapping
+from django.contrib.gis.geos import Point
 from decouple import config
 from Impact.models import (
     AffectedPopulation, ImpactedGDP, AffectedCrops,
     AffectedRoads, DisplacedPopulation, AffectedLivestock,
-    AffectedGrazingLand
+    AffectedGrazingLand, SectorData
 )
 
-# Get the current date in the required format
 current_date = datetime.now().strftime('%Y%m%d')
 
 class Command(BaseCommand):
-    help = 'Sync remote shapefiles from SFTP and upload to database'
+    help = 'Sync remote shapefiles and sector data from SFTP and upload to database'
     
-    SHAPEFILE_DIR = './temp_shapefiles'  # Temporary local directory
+    SHAPEFILE_DIR = './temp_shapefiles'
     
-    # Dynamically generate filenames based on the current date
     model_configurations = {
         AffectedPopulation: f'{current_date}0000_FPimpacts-Population.shp',
         ImpactedGDP: f'{current_date}0000_FPimpacts-GDP.shp',
@@ -28,6 +29,7 @@ class Command(BaseCommand):
         DisplacedPopulation: f'{current_date}0000_FPimpacts-Displaced.shp',
         AffectedLivestock: f'{current_date}0000_FPimpacts-Livestock.shp',
         AffectedGrazingLand: f'{current_date}0000_FPimpacts-Grazing.shp',
+        SectorData: 'fp_sections_igad.shp'
     }
     
     field_mapping = {
@@ -46,20 +48,13 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         """Main command handler"""
         try:
-            # Ensure local shapefile directory exists
             os.makedirs(self.SHAPEFILE_DIR, exist_ok=True)
-            
-            # Connect to SFTP and download files
             self.sync_shapefiles()
-            
-            # Load shapefiles into the database
             self.load_shapefiles()
-            
         except Exception as e:
             self.stderr.write(self.style.ERROR(f'Error: {str(e)}'))
             raise
         finally:
-            # Clean up temporary files
             self.cleanup_temp_files()
     
     def connect_sftp(self, host, port, username, password):
@@ -70,38 +65,32 @@ class Command(BaseCommand):
             return paramiko.SFTPClient.from_transport(transport)
         except Exception as e:
             raise Exception(f"Failed to connect to SFTP server: {str(e)}")
-    
+
     def sync_shapefiles(self):
-        """Download shapefiles and their associated files from remote SFTP server."""
+        """Download shapefiles and sector data from remote SFTP server."""
         sftp_host = config('SFTP_HOST')
         sftp_port = config('SFTP_PORT')
         sftp_username = config('SFTP_USERNAME')
         sftp_password = config('SFTP_PASSWORD')
         remote_folder_base = config('REMOTE_FOLDER_BASE')
+        sectors_remote_folder = config('SHAPEFILE_REMOTE_DIR')
         
-        # Construct the dynamic remote folder path
+        extensions = ['.shp', '.shx', '.dbf', '.prj']
         remote_date = datetime.now().strftime('%Y/%m/%d/00')
         remote_folder = f"{remote_folder_base}/{remote_date}"
-        
-        # Required shapefile extensions
-        extensions = ['.shp', '.shx', '.dbf', '.prj']
-        
-        # Ensure the remote folder path ends with a forward slash
-        remote_folder = remote_folder.rstrip('/') + '/'
         
         self.stdout.write("Connecting to SFTP server...")
         sftp = self.connect_sftp(sftp_host, sftp_port, sftp_username, sftp_password)
         
         try:
             for model, filename in self.model_configurations.items():
-                # Get the base filename without extension
                 base_filename = os.path.splitext(filename)[0]
+                current_remote_folder = sectors_remote_folder if model == SectorData else remote_folder
                 
-                # Download each required file
                 for ext in extensions:
                     remote_file = f"{base_filename}{ext}"
                     local_path = os.path.join(self.SHAPEFILE_DIR, remote_file)
-                    remote_path = os.path.join(remote_folder, remote_file).replace('\\', '/')
+                    remote_path = os.path.join(current_remote_folder, remote_file).replace('\\', '/')
                     
                     try:
                         self.stdout.write(f"Downloading {remote_file}...")
@@ -111,34 +100,115 @@ class Command(BaseCommand):
                         ))
                     except FileNotFoundError:
                         msg = f"Warning: {remote_file} not found at {remote_path}"
-                        # Only raise error if missing .shp, .shx, or .dbf
                         if ext in ['.shp', '.shx', '.dbf']:
                             raise Exception(msg)
                         else:
                             self.stdout.write(self.style.WARNING(msg))
         finally:
             sftp.close()
-    
+
+    def safe_convert(self, value, type_func, default=None):
+        """Safely convert values to specified type."""
+        if pd.isna(value) or value == '':
+            return default
+        try:
+            return type_func(value)
+        except (ValueError, TypeError):
+            return default
+
+    def process_sector_data(self, gdf):
+        """Process sector data with proper type conversion."""
+        processed_records = []
+        
+        for idx, row in gdf.iterrows():
+            try:
+                # Debug output for sec_code
+                self.stdout.write(f"Raw sec_code value: {row.get('sec_code')}, Type: {type(row.get('sec_code'))}")
+                
+                # Handle geometry
+                if row.geometry.geom_type == 'Point':
+                    coords = (row.geometry.x, row.geometry.y)
+                else:
+                    coords = (row.geometry.centroid.x, row.geometry.centroid.y)
+                point = Point(coords[0], coords[1], srid=4326)
+                
+                # Create sector record with proper type conversion
+                sector_record = {
+                    'sec_code': self.safe_convert(row.get('sec_code'), int, 0),
+                    'sec_name': str(row.get('sec_name', '')),
+                    'basin': str(row.get('basin', '')),
+                    'domain': str(row.get('domain', '')),
+                    'admin_b_l1': str(row.get('admin_b_l1', '')),
+                    'admin_b_l2': str(row.get('admin_b_l2', '')),
+                    'admin_b_l3': str(row.get('admin_b_l3', '')),
+                    'sec_rs': str(row.get('sec_rs', '')),
+                    'area': self.safe_convert(row.get('area'), float, 0.0),
+                    'lat': self.safe_convert(row.get('lat'), float, 0.0),
+                    'lon': self.safe_convert(row.get('lon'), float, 0.0),
+                    'q_thr1': self.safe_convert(row.get('q_thr1'), float, 0.0),
+                    'q_thr2': self.safe_convert(row.get('q_thr2'), float, 0.0),
+                    'q_thr3': self.safe_convert(row.get('q_thr3'), float, 0.0),
+                    'cat': str(row.get('cat', '')),
+                    'geom': point
+                }
+                
+                # Add ID if it exists
+                if 'id' in row:
+                    sector_record['id'] = self.safe_convert(row.get('id'), int, None)
+                
+                processed_records.append(sector_record)
+                
+                if (idx + 1) % 100 == 0:
+                    self.stdout.write(f"Processed {idx + 1} sectors...")
+                    
+            except Exception as e:
+                self.stdout.write(self.style.WARNING(
+                    f"Error processing sector at index {idx}: {str(e)}\n"
+                    f"Raw data: {row.to_dict()}"
+                ))
+                continue
+                
+        return processed_records
+
     def load_shapefiles(self):
-        """Load shapefiles into the database."""
+        """Load shapefiles and sector data into the database."""
         for model, filename in self.model_configurations.items():
-            shapefile_path = os.path.join(self.SHAPEFILE_DIR, filename)
+            file_path = os.path.join(self.SHAPEFILE_DIR, filename)
             
-            self.stdout.write(f"Loading data for {model.__name__} from {shapefile_path}...")
+            self.stdout.write(f"Loading data for {model.__name__} from {file_path}...")
             
             try:
-                # Clear existing data for the model
+                # Clear existing data
                 model.objects.all().delete()
                 
-                # Create the LayerMapping and save
-                lm = LayerMapping(
-                    model, 
-                    shapefile_path, 
-                    self.field_mapping,
-                    transform=False,
-                    encoding='iso-8859-1'
-                )
-                lm.save(strict=True, verbose=True)
+                if model == SectorData:
+                    # Read and process sector data
+                    gdf = gpd.read_file(file_path)
+                    
+                    # Debug output for data structure
+                    self.stdout.write(f"Columns in shapefile: {gdf.columns.tolist()}")
+                    self.stdout.write(f"First row data: {gdf.iloc[0].to_dict()}")
+                    
+                    # Process and save sectors
+                    processed_records = self.process_sector_data(gdf)
+                    
+                    # Bulk create records
+                    sectors_to_create = [SectorData(**record) for record in processed_records]
+                    SectorData.objects.bulk_create(sectors_to_create, batch_size=100)
+                    
+                    self.stdout.write(self.style.SUCCESS(
+                        f"Successfully loaded {len(processed_records)} sectors into database."
+                    ))
+                else:
+                    # Handle regular shapefile loading
+                    lm = LayerMapping(
+                        model, 
+                        file_path, 
+                        self.field_mapping,
+                        transform=False,
+                        encoding='iso-8859-1'
+                    )
+                    lm.save(strict=True, verbose=True)
                 
                 self.stdout.write(self.style.SUCCESS(
                     f"Data for {model.__name__} loaded successfully."
@@ -146,7 +216,7 @@ class Command(BaseCommand):
             
             except Exception as e:
                 raise Exception(
-                    f"Error loading shapefile for {model.__name__}: {str(e)}"
+                    f"Error loading data for {model.__name__}: {str(e)}"
                 )
     
     def cleanup_temp_files(self):

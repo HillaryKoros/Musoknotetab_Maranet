@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     # 'wagtail.admin',
     # 'wagtail',
     # 'modelcluster',
+    
 ]
 
 MIDDLEWARE = [

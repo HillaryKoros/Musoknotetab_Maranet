@@ -62,6 +62,12 @@ const HAZARD_ALERT_LAYERS = [
 // Base map definitions
 const BASE_MAPS = [
   {
+    name: 'ICPAC',
+    url: 'https://eahazardswatch.icpac.net/tileserver-gl/styles/droughtwatch/{z}/{x}/{y}.png',
+    attribution: '&copy; IGAD-ICPAC_FloodWatch'
+
+  },
+  {
     name: 'OpenStreetMap',
     url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors'

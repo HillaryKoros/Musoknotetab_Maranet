@@ -58,6 +58,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     # 'wagtail.contrib.redirects.middleware.RedirectMiddleware',  # Wagtail middleware
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -135,6 +136,8 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 LEAFLET_CONFIG = {
     'DEFAULT_CENTER': (-1.286389, 36.817223),
@@ -161,6 +164,9 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
 }
+
+
+
 
 # WAGTAILADMIN_BASE_URL = 'http://localhost:8000'
 # WAGTAIL_SITE_NAME = 'flood_watch_system'

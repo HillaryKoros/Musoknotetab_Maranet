@@ -1,14 +1,8 @@
-// ============================================================================
-// Core imports
-// ============================================================================
-import React, { useState, useCallback } from 'react';
-import { MapContainer, TileLayer, WMSTileLayer, useMapEvents, Popup } from 'react-leaflet';
+import React, { useState, useCallback, useEffect } from 'react';
+import { MapContainer, TileLayer, WMSTileLayer, useMapEvents, Popup, useMap } from 'react-leaflet';
 import { Form, ListGroup } from 'react-bootstrap';
 import 'leaflet/dist/leaflet.css';
 
-// ============================================================================
-// Configuration Constants
-// ============================================================================
 const MAP_CONFIG = {
   initialPosition: [4.6818, 34.9911],
   initialZoom: 5,
@@ -19,7 +13,6 @@ const MAP_CONFIG = {
   popupOffset: [0, -10]
 };
 
-// REST API endpoints configuration
 const REST_API_ENDPOINTS = {
   affectedPop: 'http://127.0.0.1:8000/api/affectedPop/',
   affectedGDP: 'http://127.0.0.1:8000/api/affectedGDP/',
@@ -30,10 +23,6 @@ const REST_API_ENDPOINTS = {
   affectedGrazingLand: 'http://127.0.0.1:8000/api/affectedGrazingLand/',
 };
 
-// ============================================================================
-// Layer Definitions
-// ============================================================================
-// Helper function to create WMS layer configurations
 const createWMSLayer = (name, layerId, queryable = true) => ({
   name,
   layer: `floodwatch:${layerId}`,
@@ -41,7 +30,10 @@ const createWMSLayer = (name, layerId, queryable = true) => ({
   queryable
 });
 
-// Impact layer definitions
+const HAZARD_LAYERS = [
+  createWMSLayer('Inundation Map', 'flood_hazard_map_floodproofs_202501030000'),
+];
+
 const IMPACT_LAYERS = [
   createWMSLayer('Affected Population', 'Impact_affectedpopulation'),
   createWMSLayer('Affected GDP', 'Impact_impactedgdp'),
@@ -53,19 +45,11 @@ const IMPACT_LAYERS = [
   createWMSLayer('SectorData', 'Impact_sectordata')
 ];
 
-// Hazard and alert layer definitions
-const HAZARD_ALERT_LAYERS = [
-  createWMSLayer('Inundation Map', 'flood_hazard_map_floodproofs_202501030000'),
-  createWMSLayer('Alerts Map', 'Alerts')
-];
-
-// Base map definitions
 const BASE_MAPS = [
   {
     name: 'ICPAC',
     url: 'https://eahazardswatch.icpac.net/tileserver-gl/styles/droughtwatch/{z}/{x}/{y}.png',
     attribution: '&copy; IGAD-ICPAC_FloodWatch'
-
   },
   {
     name: 'OpenStreetMap',
@@ -84,10 +68,6 @@ const BASE_MAPS = [
   }
 ];
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
-// Format feature value for display
 const formatFeatureValue = (value) => {
   if (typeof value === 'number') {
     return value.toLocaleString(undefined, {
@@ -97,7 +77,6 @@ const formatFeatureValue = (value) => {
   return value?.toString() || 'N/A';
 };
 
-// Get human-readable property name
 const getPropertyLabel = (key) => {
   return key
     .split('_')
@@ -105,10 +84,6 @@ const getPropertyLabel = (key) => {
     .join(' ');
 };
 
-// ============================================================================
-// UI Components
-// ============================================================================
-// Popup content component
 const FeatureInfoPopup = ({ info }) => {
   if (!info?.data?.length) return null;
   
@@ -118,7 +93,12 @@ const FeatureInfoPopup = ({ info }) => {
       {info.data.map((feature, index) => (
         <div key={index} className="feature-details">
           {Object.entries(feature.properties)
-            .filter(([_, value]) => value !== null && value !== undefined)
+            .filter(([key, value]) => (
+              value !== null && 
+              value !== undefined && 
+              !key.startsWith('_') && 
+              key !== 'bbox'
+            ))
             .map(([key, value]) => (
               <div key={key} className="property-row">
                 <span className="property-label">{getPropertyLabel(key)}:</span>
@@ -131,38 +111,7 @@ const FeatureInfoPopup = ({ info }) => {
   );
 };
 
-// Layer selection component
-const LayerSelector = ({ title, layers, selectedLayer, onLayerSelect }) => (
-  <div className="layer-selector">
-    <h4>{title}</h4>
-    <ListGroup className="mb-4">
-      {layers.map((layer) => (
-        <ListGroup.Item key={layer.name}>
-          <Form.Check
-            type="radio"
-            name="layerSelection"
-            label={layer.name}
-            onChange={() => onLayerSelect(layer)}
-            checked={selectedLayer === layer.layer}
-          />
-        </ListGroup.Item>
-      ))}
-    </ListGroup>
-  </div>
-);
-
-// Legend component
-const Legend = ({ legendUrl }) => (
-  <div className="map-legend">
-    <h5>Legend</h5>
-    <img src={legendUrl} alt="Legend" />
-  </div>
-);
-
-// ============================================================================
-// Map Interaction Handler
-// ============================================================================
-const LayerInteractionHandler = ({ selectedLayer, onFeatureClick }) => {
+const MapInteractionHandler = ({ selectedLayer, onFeatureClick }) => {
   const map = useMapEvents({
     click: async (e) => {
       if (!selectedLayer) return;
@@ -172,20 +121,35 @@ const LayerInteractionHandler = ({ selectedLayer, onFeatureClick }) => {
       const size = map.getSize();
       const point = map.latLngToContainerPoint(e.latlng);
       
+      const buffer = 8; // Increased buffer size for better feature detection
+      const x = Math.round(point.x);
+      const y = Math.round(point.y);
+      
       try {
-        // Construct GetFeatureInfo URL
-        const getFeatureInfoUrl = `${MAP_CONFIG.geoserverWMSUrl}?REQUEST=GetFeatureInfo&SERVICE=WMS` +
-          `&VERSION=1.1.1&LAYERS=${selectedLayer}&QUERY_LAYERS=${selectedLayer}` +
-          `&INFO_FORMAT=${MAP_CONFIG.getFeatureInfoFormat}&X=${Math.round(point.x)}` +
-          `&Y=${Math.round(point.y)}&BBOX=${bounds.toBBoxString()}&WIDTH=${size.x}&HEIGHT=${size.y}` +
-          `&SRS=EPSG:4326`;
+        const params = new URLSearchParams({
+          REQUEST: 'GetFeatureInfo',
+          SERVICE: 'WMS',
+          VERSION: '1.1.1',
+          LAYERS: selectedLayer,
+          QUERY_LAYERS: selectedLayer,
+          INFO_FORMAT: MAP_CONFIG.getFeatureInfoFormat,
+          FEATURE_COUNT: '10',
+          X: x.toString(),
+          Y: y.toString(),
+          BUFFER: buffer.toString(),
+          BBOX: bounds.toBBoxString(),
+          WIDTH: size.x.toString(),
+          HEIGHT: size.y.toString(),
+          SRS: 'EPSG:4326'
+        });
 
+        const getFeatureInfoUrl = `${MAP_CONFIG.geoserverWMSUrl}?${params.toString()}`;
+        
         const response = await fetch(getFeatureInfoUrl);
         if (!response.ok) throw new Error('GetFeatureInfo request failed');
         
         const data = await response.json();
         
-        // Only show popup if features were found
         if (data.features?.length > 0) {
           onFeatureClick({
             location: { lat, lng },
@@ -201,28 +165,47 @@ const LayerInteractionHandler = ({ selectedLayer, onFeatureClick }) => {
   return null;
 };
 
-// ============================================================================
-// Main Component
-// ============================================================================
+const LayerSelector = ({ title, layers, selectedLayer, onLayerSelect }) => (
+  <div className="layer-selector">
+    <h4>{title}</h4>
+    <ListGroup className="mb-4">
+      {layers.map((layer) => (
+        <ListGroup.Item key={layer.name} className="layer-item">
+          <Form.Check
+            type="radio"
+            name="layerSelection"
+            id={`layer-${layer.name}`}
+            label={layer.name}
+            onChange={() => onLayerSelect(layer)}
+            checked={selectedLayer === layer.layer}
+          />
+        </ListGroup.Item>
+      ))}
+    </ListGroup>
+  </div>
+);
+
+const Legend = ({ legendUrl }) => (
+  <div className="map-legend">
+    <h5>Legend</h5>
+    <img src={legendUrl} alt="Legend" onError={(e) => e.target.style.display = 'none'} />
+  </div>
+);
+
 const MapViewer = () => {
-  // State management
   const [selectedLayer, setSelectedLayer] = useState(null);
   const [activeLegend, setActiveLegend] = useState(null);
   const [baseMap, setBaseMap] = useState(BASE_MAPS[0]);
   const [popupInfo, setPopupInfo] = useState(null);
+  const [mapKey, setMapKey] = useState(0); // Key for forcing WMS layer refresh
 
-  // Layer selection handler with debounce
-  const handleLayerSelection = (layer) => {
-    setSelectedLayer(null);
+  const handleLayerSelection = useCallback((layer) => {
+    setSelectedLayer(layer.layer);
+    setActiveLegend(layer.legend);
     setPopupInfo(null);
-    
-    setTimeout(() => {
-      setSelectedLayer(layer.layer);
-      setActiveLegend(layer.legend);
-    }, 100);
-  };
+    setMapKey(prev => prev + 1); // Force WMS layer refresh
+  }, []);
 
-  // Feature click handler for popup
   const handleFeatureClick = useCallback((info) => {
     setPopupInfo(info);
   }, []);
@@ -231,28 +214,29 @@ const MapViewer = () => {
     <div className="map-viewer">
       <div className="sidebar">
         <LayerSelector
-          title="Impact Layers"
-          layers={IMPACT_LAYERS}
+          title="Inundation Map"
+          layers={HAZARD_LAYERS}
           selectedLayer={selectedLayer}
           onLayerSelect={handleLayerSelection}
         />
         
         <LayerSelector
-          title="Inundation & Alert Maps"
-          layers={HAZARD_ALERT_LAYERS}
+          title="Impact Layers"
+          layers={IMPACT_LAYERS}
           selectedLayer={selectedLayer}
           onLayerSelect={handleLayerSelection}
         />
 
         <h4>Base Maps</h4>
         <ListGroup>
-          {BASE_MAPS.map((basemap, index) => (
-            <ListGroup.Item key={basemap.name}>
+          {BASE_MAPS.map((basemap) => (
+            <ListGroup.Item key={basemap.name} className="basemap-item">
               <Form.Check
                 type="radio"
                 name="basemapSelection"
+                id={`basemap-${basemap.name}`}
                 label={basemap.name}
-                onChange={() => setBaseMap(BASE_MAPS[index])}
+                onChange={() => setBaseMap(basemap)}
                 checked={baseMap === basemap}
               />
             </ListGroup.Item>
@@ -267,21 +251,25 @@ const MapViewer = () => {
           scrollWheelZoom={true}
           style={{ height: '100%', width: '100%' }}
         >
-          <LayerInteractionHandler 
+          <MapInteractionHandler 
             selectedLayer={selectedLayer}
             onFeatureClick={handleFeatureClick}
           />
           
-          <TileLayer url={baseMap.url} attribution={baseMap.attribution} />
+          <TileLayer 
+            url={baseMap.url} 
+            attribution={baseMap.attribution} 
+          />
           
           {selectedLayer && (
             <WMSTileLayer
-              key={selectedLayer}
+              key={`wms-${mapKey}`}
               url={MAP_CONFIG.geoserverWMSUrl}
               layers={selectedLayer}
               format="image/png"
               transparent={true}
               attribution="GeoServer Floodwatch"
+              version="1.1.1"
             />
           )}
 
@@ -332,8 +320,14 @@ const MapViewer = () => {
           z-index: 1000;
         }
 
+        .map-legend img {
+          max-width: 200px;
+          max-height: 300px;
+        }
+
         .feature-popup {
           min-width: 200px;
+          max-width: 300px;
           padding: 12px;
         }
 
@@ -353,6 +347,7 @@ const MapViewer = () => {
           display: flex;
           justify-content: space-between;
           gap: 10px;
+          font-size: 0.9rem;
         }
 
         .property-label {
@@ -362,19 +357,28 @@ const MapViewer = () => {
 
         .property-value {
           text-align: right;
+          word-break: break-word;
         }
 
         .layer-selector h4 {
           margin-bottom: 12px;
         }
 
-        /* Leaflet popup customization */
+        .layer-item, .basemap-item {
+          padding: 8px 12px;
+        }
+
         .leaflet-popup-content {
           margin: 0;
+          min-width: 200px;
         }
 
         .leaflet-popup-content-wrapper {
           padding: 0;
+        }
+
+        .leaflet-container {
+          font-family: inherit;
         }
       `}</style>
     </div>

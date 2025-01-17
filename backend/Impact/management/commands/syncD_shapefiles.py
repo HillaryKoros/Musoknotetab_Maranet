@@ -6,18 +6,17 @@ import geopandas as gpd
 import pandas as pd
 from django.core.management.base import BaseCommand
 from django.contrib.gis.utils import LayerMapping
-from django.contrib.gis.geos import Point
 from decouple import config
 from Impact.models import (
     AffectedPopulation, ImpactedGDP, AffectedCrops,
     AffectedRoads, DisplacedPopulation, AffectedLivestock,
-    AffectedGrazingLand, SectorData
+    AffectedGrazingLand
 )
 
 current_date = datetime.now().strftime('%Y%m%d')
 
 class Command(BaseCommand):
-    help = 'Sync remote shapefiles and sector data from SFTP and upload to database'
+    help = 'Sync remote impact layer shapefiles from SFTP and upload to database'
     
     SHAPEFILE_DIR = './temp_shapefiles'
     
@@ -28,8 +27,7 @@ class Command(BaseCommand):
         AffectedRoads: f'{current_date}0000_FPimpacts-KmRoads.shp',
         DisplacedPopulation: f'{current_date}0000_FPimpacts-Displaced.shp',
         AffectedLivestock: f'{current_date}0000_FPimpacts-Livestock.shp',
-        AffectedGrazingLand: f'{current_date}0000_FPimpacts-Grazing.shp',
-        SectorData: 'fp_sections_igad.shp'
+        AffectedGrazingLand: f'{current_date}0000_FPimpacts-Grazing.shp'
     }
     
     field_mapping = {
@@ -67,13 +65,12 @@ class Command(BaseCommand):
             raise Exception(f"Failed to connect to SFTP server: {str(e)}")
 
     def sync_shapefiles(self):
-        """Download shapefiles and sector data from remote SFTP server."""
+        """Download impact layer shapefiles from remote SFTP server."""
         sftp_host = config('SFTP_HOST')
         sftp_port = config('SFTP_PORT')
         sftp_username = config('SFTP_USERNAME')
         sftp_password = config('SFTP_PASSWORD')
         remote_folder_base = config('REMOTE_FOLDER_BASE')
-        sectors_remote_folder = config('SHAPEFILE_REMOTE_DIR')
         
         extensions = ['.shp', '.shx', '.dbf', '.prj']
         remote_date = datetime.now().strftime('%Y/%m/%d/00')
@@ -85,12 +82,11 @@ class Command(BaseCommand):
         try:
             for model, filename in self.model_configurations.items():
                 base_filename = os.path.splitext(filename)[0]
-                current_remote_folder = sectors_remote_folder if model == SectorData else remote_folder
                 
                 for ext in extensions:
                     remote_file = f"{base_filename}{ext}"
                     local_path = os.path.join(self.SHAPEFILE_DIR, remote_file)
-                    remote_path = os.path.join(current_remote_folder, remote_file).replace('\\', '/')
+                    remote_path = os.path.join(remote_folder, remote_file).replace('\\', '/')
                     
                     try:
                         self.stdout.write(f"Downloading {remote_file}...")
@@ -107,71 +103,8 @@ class Command(BaseCommand):
         finally:
             sftp.close()
 
-    def safe_convert(self, value, type_func, default=None):
-        """Safely convert values to specified type."""
-        if pd.isna(value) or value == '':
-            return default
-        try:
-            return type_func(value)
-        except (ValueError, TypeError):
-            return default
-
-    def process_sector_data(self, gdf):
-        """Process sector data with proper type conversion."""
-        processed_records = []
-        
-        for idx, row in gdf.iterrows():
-            try:
-                # Debug output for sec_code
-                self.stdout.write(f"Raw sec_code value: {row.get('sec_code')}, Type: {type(row.get('sec_code'))}")
-                
-                # Handle geometry
-                if row.geometry.geom_type == 'Point':
-                    coords = (row.geometry.x, row.geometry.y)
-                else:
-                    coords = (row.geometry.centroid.x, row.geometry.centroid.y)
-                point = Point(coords[0], coords[1], srid=4326)
-                
-                # Create sector record with proper type conversion
-                sector_record = {
-                    'sec_code': self.safe_convert(row.get('sec_code'), int, 0),
-                    'sec_name': str(row.get('sec_name', '')),
-                    'basin': str(row.get('basin', '')),
-                    'domain': str(row.get('domain', '')),
-                    'admin_b_l1': str(row.get('admin_b_l1', '')),
-                    'admin_b_l2': str(row.get('admin_b_l2', '')),
-                    'admin_b_l3': str(row.get('admin_b_l3', '')),
-                    'sec_rs': str(row.get('sec_rs', '')),
-                    'area': self.safe_convert(row.get('area'), float, 0.0),
-                    'lat': self.safe_convert(row.get('lat'), float, 0.0),
-                    'lon': self.safe_convert(row.get('lon'), float, 0.0),
-                    'q_thr1': self.safe_convert(row.get('q_thr1'), float, 0.0),
-                    'q_thr2': self.safe_convert(row.get('q_thr2'), float, 0.0),
-                    'q_thr3': self.safe_convert(row.get('q_thr3'), float, 0.0),
-                    'cat': str(row.get('cat', '')),
-                    'geom': point
-                }
-                
-                # Add ID if it exists
-                if 'id' in row:
-                    sector_record['id'] = self.safe_convert(row.get('id'), int, None)
-                
-                processed_records.append(sector_record)
-                
-                if (idx + 1) % 100 == 0:
-                    self.stdout.write(f"Processed {idx + 1} sectors...")
-                    
-            except Exception as e:
-                self.stdout.write(self.style.WARNING(
-                    f"Error processing sector at index {idx}: {str(e)}\n"
-                    f"Raw data: {row.to_dict()}"
-                ))
-                continue
-                
-        return processed_records
-
     def load_shapefiles(self):
-        """Load shapefiles and sector data into the database."""
+        """Load impact layer shapefiles into the database."""
         for model, filename in self.model_configurations.items():
             file_path = os.path.join(self.SHAPEFILE_DIR, filename)
             
@@ -181,34 +114,15 @@ class Command(BaseCommand):
                 # Clear existing data
                 model.objects.all().delete()
                 
-                if model == SectorData:
-                    # Read and process sector data
-                    gdf = gpd.read_file(file_path)
-                    
-                    # Debug output for data structure
-                    self.stdout.write(f"Columns in shapefile: {gdf.columns.tolist()}")
-                    self.stdout.write(f"First row data: {gdf.iloc[0].to_dict()}")
-                    
-                    # Process and save sectors
-                    processed_records = self.process_sector_data(gdf)
-                    
-                    # Bulk create records
-                    sectors_to_create = [SectorData(**record) for record in processed_records]
-                    SectorData.objects.bulk_create(sectors_to_create, batch_size=100)
-                    
-                    self.stdout.write(self.style.SUCCESS(
-                        f"Successfully loaded {len(processed_records)} sectors into database."
-                    ))
-                else:
-                    # Handle regular shapefile loading
-                    lm = LayerMapping(
-                        model, 
-                        file_path, 
-                        self.field_mapping,
-                        transform=False,
-                        encoding='iso-8859-1'
-                    )
-                    lm.save(strict=True, verbose=True)
+                # Load shapefile using LayerMapping
+                lm = LayerMapping(
+                    model, 
+                    file_path, 
+                    self.field_mapping,
+                    transform=False,
+                    encoding='iso-8859-1'
+                )
+                lm.save(strict=True, verbose=True)
                 
                 self.stdout.write(self.style.SUCCESS(
                     f"Data for {model.__name__} loaded successfully."

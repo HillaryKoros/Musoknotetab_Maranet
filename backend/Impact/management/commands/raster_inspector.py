@@ -12,7 +12,7 @@ class Command(BaseCommand):
             'raster_path',
             nargs='?',
             type=str,
-            default='/home/koros/IGAD-ICPAC/flood_hazard_map_floodproofs_202501030000.tif',
+            default='/home/koros/IGAD-ICPAC/flood_hazard_map_floodproofs_202501210000.tif',
             help='Path to the flood hazard raster file'
         )
         parser.add_argument(

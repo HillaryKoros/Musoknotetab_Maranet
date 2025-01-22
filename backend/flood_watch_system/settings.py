@@ -14,6 +14,10 @@ from decouple import config, Csv
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+# Update to point to Vite's dist directory instead of build
+FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR.parent, 'frontend'))
+FRONTEND_DIST_DIR = os.path.abspath(os.path.join(FRONTEND_DIR, 'dist'))
+
 
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
@@ -138,15 +142,20 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# # Add static files configuration
+# STATICFILES_DIRS = [
+#     os.path.join(FRONTEND_DIST_DIR, 'assets')
+# ]
 
-LEAFLET_CONFIG = {
-    'DEFAULT_CENTER': (-1.286389, 36.817223),
-    'DEFAULT_ZOOM': 3,
-    'MIN_ZOOM': 3,
-    'MAX_ZOOM': 18,
-    'SCALE': 'both',
-    'ATTRIBUTION_PREFIX': 'IGAD-ICPAC'
-}
+
+# LEAFLET_CONFIG = {
+#     'DEFAULT_CENTER': (-1.286389, 36.817223),
+#     'DEFAULT_ZOOM': 3,
+#     'MIN_ZOOM': 3,
+#     'MAX_ZOOM': 18,
+#     'SCALE': 'both',
+#     'ATTRIBUTION_PREFIX': 'IGAD-ICPAC'
+# }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

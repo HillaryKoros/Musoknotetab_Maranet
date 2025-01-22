@@ -2,32 +2,17 @@ from django.contrib import admin
 from leaflet.admin import LeafletGeoAdmin
 from .models import (
     AffectedGrazingLand, AffectedPopulation, ImpactedGDP, AffectedCrops,
-    AffectedLivestock, AffectedRoads, DisplacedPopulation,SectorData
+    AffectedLivestock, AffectedRoads, DisplacedPopulation,SectorData,SectorForecast,WaterBodies
 )
 
 class BaseImpactAdmin(LeafletGeoAdmin):
-    list_display = (
-        'gid_0',
-        'name_0', 
-        'name_1',
-        'engtype_1',
-        'lack_cc',
-        'cod',
-        'stock',
-        'flood_tot',
-        'flood_perc'
-    )
-    search_fields = ('name_0', 'name_1', 'cod')
-    list_filter = ('name_0', 'engtype_1')
-
- 
-    # # Leaflet settings
-    # settings_overrides = {
-    #     'DEFAULT_CENTER': (0.0, 36.0),  # Centered on East Africa
-    #     'DEFAULT_ZOOM': 4,
-    #     'MIN_ZOOM': 3,
-    #     'MAX_ZOOM': 18,
-    # }
+    # Leaflet settings
+    settings_overrides = {
+        'DEFAULT_CENTER': (0.0, 36.0),  # Centered on East Africa
+        'DEFAULT_ZOOM': 4,
+        'MIN_ZOOM': 3,
+        'MAX_ZOOM': 18,
+    }
 
 @admin.register(AffectedPopulation)
 class AffectedPopulationAdmin(BaseImpactAdmin):
@@ -58,7 +43,17 @@ class DisplacedPopulationAdmin(BaseImpactAdmin):
     pass
 
 @admin.register(SectorData)
-class SectorDataAdmin(LeafletGeoAdmin):
-    list_display = ('id', 'sec_code', 'sec_name', 'basin', 'domain', 'admin_b_l1', 'area', 'lat', 'lon')
-    search_fields = ('sec_name', 'basin', 'domain')
-    list_filter = ('basin', 'domain')
+class SectorDataAdmin(BaseImpactAdmin):
+    list_display = ['sec_code','sec_name','lat','lon','geom']
+    search_fields = ['sec_code','sec_name','basin','geom']
+
+@admin.register(SectorForecast)
+class SectorForecastAdmin(BaseImpactAdmin):
+    list_display = ['sector', 'model_type', 'time_point']
+    search_fields = ['sector', 'model_type', 'time_point']
+
+
+@admin.register(WaterBodies)
+class WaterBodiesAdmin(BaseImpactAdmin):
+    list_display = ['name_of_wa', 'type_of_wa']
+    search_fields = ['name_of_wa', 'type_of_wa','geometry']

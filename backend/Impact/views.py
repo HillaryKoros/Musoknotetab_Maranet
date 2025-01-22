@@ -1,14 +1,16 @@
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 from drf_spectacular.openapi import AutoSchema
 from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from .serializers import (
     AffectedPopulationSerializer, ImpactedGDPSerializer, AffectedCropsSerializer,
     AffectedRoadsSerializer, DisplacedPopulationSerializer, AffectedLivestockSerializer,
-    AffectedGrazingLandSerializer, SectorDataSerializer
+    AffectedGrazingLandSerializer, SectorDataSerializer,SectorForecastSerializer,WaterBodiesSerializer
 )
-from .models import (
+from Impact.models import (
     AffectedPopulation, ImpactedGDP, AffectedCrops, AffectedGrazingLand,
-    AffectedLivestock, AffectedRoads, DisplacedPopulation, SectorData
+    AffectedLivestock, AffectedRoads, DisplacedPopulation, SectorData,SectorForecast,WaterBodies
 )
 
 @extend_schema(tags=['affected-population'])
@@ -59,3 +61,16 @@ class SectorDataViewSet(viewsets.ModelViewSet):
     schema = AutoSchema()
     queryset = SectorData.objects.all()
     serializer_class = SectorDataSerializer
+
+@extend_schema(tags=['sector-forecast'])
+class SectorForecastViewSet(viewsets.ReadOnlyModelViewSet):
+    schema = AutoSchema()
+    queryset = SectorForecast.objects.all()
+    serializer_class = SectorForecastSerializer
+
+
+@extend_schema(tags=['waterbodies'])
+class WaterbodiesViewSet(viewsets.ReadOnlyModelViewSet):
+    schema = AutoSchema()
+    queryset = WaterBodies.objects.all()
+    serializer_class = WaterBodiesSerializer

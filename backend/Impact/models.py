@@ -170,31 +170,38 @@ class SectorData(models.Model):
         verbose_name_plural = "SectorData"
 
 
-# class TimeSeriesData(models.Model):
-#     sector = models.ForeignKey(SectorData, on_delete=models.CASCADE, related_name="time_series")
-#     timestamp = models.DateTimeField()
-#     value = models.FloatField()  # The time series value (e.g., discharge, etc.)
-#     source = models.CharField(max_length=50)  # E.g., "gfs", "icon", etc.
+# 9. timeseries model
+class SectorForecast(models.Model):
+    sector = models.ForeignKey(SectorData, on_delete=models.CASCADE)
+    model_type = models.CharField(max_length=10, choices=[('GFS', 'GFS'), ('ICON', 'ICON')])
+    time_point = models.DateTimeField()
+    forecast_value = models.FloatField(null=True)  
 
-#     class Meta:
-#         verbose_name_plural = "TimeSeriesData"
-#         unique_together = ('sector', 'timestamp', 'source')
+    class Meta:
+        verbose_name_plural = "SectorForecast"
+        indexes = [
+            models.Index(fields=['sector', 'model_type', 'time_point']),  
+        ]
 
-
-# # 9.  Create a model named waterbody
-# class WaterBody(models.Model):
-#     fid = models.FloatField()
-#     af_wtr_id = models.FloatField()
-#     sqkm = models.FloatField()
-#     name_of_wa = models.CharField(max_length=254, null=True, blank=True)  # Add both null and blank
-#     type_of_wa = models.CharField(max_length=254)
-#     shape_area = models.FloatField()
-#     shape_len = models.FloatField()
-#     geom = models.MultiPolygonField(srid=4326)
+    def __unicode__(self):
+        return f"{self.sector.sec_name} - {self.model_type} - {self.time_point}"
+    
 
 
-#     def __unicode__(self):
-#         return self.name_of_wa
+# 10. create a model named waterbodies
 
-#     class Meta:
-#         verbose_name_plural = "WaterBody"
+class WaterBodies(models.Model):
+    fid = models.FloatField()
+    af_wtr_id = models.FloatField()
+    sqkm = models.FloatField()
+    name_of_wa = models.CharField(max_length=254,blank=True,null=True)
+    type_of_wa = models.CharField(max_length=254,blank=True,null=True)
+    shape_area = models.FloatField()
+    shape_len = models.FloatField()
+    geom = models.MultiPolygonField(srid=4326)
+
+    def __unicode__(self):
+        return self.name_of_wa
+
+    class Meta:
+        verbose_name_plural = "WaterBodies"

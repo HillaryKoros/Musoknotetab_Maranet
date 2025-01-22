@@ -38,3 +38,6 @@ dist-ssr/
 
 # Data files (backend-specific)
 backend/data/
+temp_data/
+temp_rasters/
+migrations/

@@ -1,8 +1,16 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { MapContainer, TileLayer, WMSTileLayer, useMapEvents, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, WMSTileLayer, useMapEvents, Popup, useMap, LayersControl } from 'react-leaflet';
 import { Form, ListGroup } from 'react-bootstrap';
 import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 
+/********************************************************************************
+ * MAP CONFIGURATION
+ * Defines core map settings including:
+ * - Initial map position and zoom level
+ * - Geoserver WMS URL and configuration
+ * - Popup display settings
+ *******************************************************************************/
 const MAP_CONFIG = {
   initialPosition: [4.6818, 34.9911],
   initialZoom: 5,
@@ -13,6 +21,10 @@ const MAP_CONFIG = {
   popupOffset: [0, -10]
 };
 
+/********************************************************************************
+ * REST API ENDPOINTS
+ * Collection of API endpoints for retrieving various impact assessment data
+ *******************************************************************************/
 const REST_API_ENDPOINTS = {
   affectedPop: 'http://127.0.0.1:8000/api/affectedPop/',
   affectedGDP: 'http://127.0.0.1:8000/api/affectedGDP/',
@@ -23,6 +35,10 @@ const REST_API_ENDPOINTS = {
   affectedGrazingLand: 'http://127.0.0.1:8000/api/affectedGrazingLand/',
 };
 
+/********************************************************************************
+ * LAYER CONFIGURATION
+ * Utility function and layer definitions
+ *******************************************************************************/
 const createWMSLayer = (name, layerId, queryable = true) => ({
   name,
   layer: `floodwatch:${layerId}`,
@@ -32,6 +48,7 @@ const createWMSLayer = (name, layerId, queryable = true) => ({
 
 const HAZARD_LAYERS = [
   createWMSLayer('Inundation Map', 'flood_hazard_map_floodproofs_202501030000'),
+  createWMSLayer('Alerts Map', 'Alerts')
 ];
 
 const IMPACT_LAYERS = [
@@ -45,11 +62,15 @@ const IMPACT_LAYERS = [
   createWMSLayer('SectorData', 'Impact_sectordata')
 ];
 
+/********************************************************************************
+ * BASE MAP CONFIGURATION
+ * Defines available base maps
+ *******************************************************************************/
 const BASE_MAPS = [
   {
     name: 'ICPAC',
     url: 'https://eahazardswatch.icpac.net/tileserver-gl/styles/droughtwatch/{z}/{x}/{y}.png',
-    attribution: '&copy; IGAD-ICPAC_FloodWatch'
+    attribution: '&copy; ICPAC_FloodWatch'
   },
   {
     name: 'OpenStreetMap',
@@ -68,6 +89,10 @@ const BASE_MAPS = [
   }
 ];
 
+/********************************************************************************
+ * UTILITY FUNCTIONS
+ * Helper functions for formatting
+ *******************************************************************************/
 const formatFeatureValue = (value) => {
   if (typeof value === 'number') {
     return value.toLocaleString(undefined, {
@@ -84,6 +109,10 @@ const getPropertyLabel = (key) => {
     .join(' ');
 };
 
+/********************************************************************************
+ * FEATURE INFO COMPONENTS
+ * Components for displaying feature information
+ *******************************************************************************/
 const FeatureInfoPopup = ({ info }) => {
   if (!info?.data?.length) return null;
   
@@ -111,6 +140,10 @@ const FeatureInfoPopup = ({ info }) => {
   );
 };
 
+/********************************************************************************
+ * MAP INTERACTION HANDLER
+ * Manages map click events and feature information retrieval
+ *******************************************************************************/
 const MapInteractionHandler = ({ selectedLayer, onFeatureClick }) => {
   const map = useMapEvents({
     click: async (e) => {
@@ -121,7 +154,7 @@ const MapInteractionHandler = ({ selectedLayer, onFeatureClick }) => {
       const size = map.getSize();
       const point = map.latLngToContainerPoint(e.latlng);
       
-      const buffer = 8; // Increased buffer size for better feature detection
+      const buffer = 8;
       const x = Math.round(point.x);
       const y = Math.round(point.y);
       
@@ -165,6 +198,10 @@ const MapInteractionHandler = ({ selectedLayer, onFeatureClick }) => {
   return null;
 };
 
+/********************************************************************************
+ * UI COMPONENTS
+ * Reusable UI components
+ *******************************************************************************/
 const LayerSelector = ({ title, layers, selectedLayer, onLayerSelect }) => (
   <div className="layer-selector">
     <h4>{title}</h4>
@@ -192,18 +229,21 @@ const Legend = ({ legendUrl }) => (
   </div>
 );
 
+/********************************************************************************
+ * MAIN MAP VIEWER COMPONENT
+ * Core component that composes all map elements
+ *******************************************************************************/
 const MapViewer = () => {
   const [selectedLayer, setSelectedLayer] = useState(null);
   const [activeLegend, setActiveLegend] = useState(null);
-  const [baseMap, setBaseMap] = useState(BASE_MAPS[0]);
   const [popupInfo, setPopupInfo] = useState(null);
-  const [mapKey, setMapKey] = useState(0); // Key for forcing WMS layer refresh
+  const [mapKey, setMapKey] = useState(0);
 
   const handleLayerSelection = useCallback((layer) => {
     setSelectedLayer(layer.layer);
     setActiveLegend(layer.legend);
     setPopupInfo(null);
-    setMapKey(prev => prev + 1); // Force WMS layer refresh
+    setMapKey(prev => prev + 1);
   }, []);
 
   const handleFeatureClick = useCallback((info) => {
@@ -226,22 +266,6 @@ const MapViewer = () => {
           selectedLayer={selectedLayer}
           onLayerSelect={handleLayerSelection}
         />
-
-        <h4>Base Maps</h4>
-        <ListGroup>
-          {BASE_MAPS.map((basemap) => (
-            <ListGroup.Item key={basemap.name} className="basemap-item">
-              <Form.Check
-                type="radio"
-                name="basemapSelection"
-                id={`basemap-${basemap.name}`}
-                label={basemap.name}
-                onChange={() => setBaseMap(basemap)}
-                checked={baseMap === basemap}
-              />
-            </ListGroup.Item>
-          ))}
-        </ListGroup>
       </div>
 
       <div className="map-container">
@@ -256,22 +280,37 @@ const MapViewer = () => {
             onFeatureClick={handleFeatureClick}
           />
           
-          <TileLayer 
-            url={baseMap.url} 
-            attribution={baseMap.attribution} 
-          />
-          
-          {selectedLayer && (
-            <WMSTileLayer
-              key={`wms-${mapKey}`}
-              url={MAP_CONFIG.geoserverWMSUrl}
-              layers={selectedLayer}
-              format="image/png"
-              transparent={true}
-              attribution="GeoServer Floodwatch"
-              version="1.1.1"
-            />
-          )}
+          <LayersControl position="topright">
+            {BASE_MAPS.map((basemap) => (
+              <LayersControl.BaseLayer 
+                key={basemap.name} 
+                name={basemap.name}
+                checked={basemap.name === 'ICPAC'}
+              >
+                <TileLayer 
+                  url={basemap.url} 
+                  attribution={basemap.attribution} 
+                />
+              </LayersControl.BaseLayer>
+            ))}
+
+            {selectedLayer && (
+              <LayersControl.Overlay 
+                checked={true} 
+                name={selectedLayer.split(':')[1]}
+              >
+                <WMSTileLayer
+                  key={`wms-${mapKey}`}
+                  url={MAP_CONFIG.geoserverWMSUrl}
+                  layers={selectedLayer}
+                  format="image/png"
+                  transparent={true}
+                  attribution="GeoServer"
+                  version="1.1.1"
+                />
+              </LayersControl.Overlay>
+            )}
+          </LayersControl>
 
           {popupInfo && (
             <Popup
@@ -292,8 +331,10 @@ const MapViewer = () => {
       <style jsx global>{`
         .map-viewer {
           display: flex;
-          height: 100vh;
+          height: calc(100vh - 160px); /* Account for navbar (100px) and footer (60px) */
           width: 100%;
+          position: relative;
+          overflow: hidden;
         }
 
         .sidebar {
@@ -302,22 +343,27 @@ const MapViewer = () => {
           background-color: #f8f9fa;
           overflow-y: auto;
           box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+          height: 100%;
+          z-index: 1000;
         }
 
         .map-container {
           flex: 1;
           position: relative;
+          height: 100%;
         }
 
         .map-legend {
           position: absolute;
-          bottom: 20px;
+          bottom: 40px; /* Increased to avoid footer overlap */
           left: 20px;
           background: white;
           padding: 10px;
           border-radius: 8px;
           box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
           z-index: 1000;
+          max-height: calc(100vh - 260px); /* Adjust for navbar, footer, and padding */
+          overflow-y: auto;
         }
 
         .map-legend img {
@@ -362,10 +408,18 @@ const MapViewer = () => {
 
         .layer-selector h4 {
           margin-bottom: 12px;
+          color: #333;
         }
 
-        .layer-item, .basemap-item {
+        .layer-item {
           padding: 8px 12px;
+          border: 1px solid #dee2e6;
+          margin-bottom: 4px;
+          border-radius: 4px;
+        }
+
+        .layer-item:hover {
+          background-color: #f8f9fa;
         }
 
         .leaflet-popup-content {
@@ -379,6 +433,120 @@ const MapViewer = () => {
 
         .leaflet-container {
           font-family: inherit;
+        }
+
+        .leaflet-bottom {
+          bottom: 40.leaflet-bottom {
+          bottom: 40px !important; /* Ensure controls don't overlap footer */
+        }
+
+        .leaflet-control-layers {
+          background: white;
+          padding: 6px;
+          border-radius: 4px;
+          box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+        }
+
+        .leaflet-control-layers-list {
+          margin-bottom: 0;
+        }
+
+        .leaflet-control-layers-expanded {
+          padding: 8px 12px;
+          background: white;
+          border-radius: 4px;
+        }
+
+        .vector-layer-control {
+          border-bottom: 1px solid #dee2e6;
+          padding-bottom: 16px;
+        }
+
+        /* Form control styling */
+        .form-check {
+          padding-left: 1.75rem;
+        }
+
+        .form-check-input {
+          margin-top: 0.3rem;
+        }
+
+        .form-check-label {
+          margin-left: 0.5rem;
+          color: #333;
+        }
+
+        /* Responsive styles */
+        @media (max-height: 768px) {
+          .map-legend {
+            max-height: calc(100vh - 300px);
+          }
+
+          .sidebar {
+            max-height: calc(100vh - 160px);
+          }
+        }
+
+        @media (max-width: 768px) {
+          .map-viewer {
+            flex-direction: column;
+            height: calc(100vh - 160px);
+          }
+
+          .sidebar {
+            width: 100%;
+            max-height: 200px;
+          }
+
+          .map-container {
+            height: calc(100% - 200px);
+          }
+
+          .map-legend {
+            bottom: 60px;
+            left: 10px;
+            max-width: calc(100% - 20px);
+          }
+
+          .layer-selector h4 {
+            font-size: 1rem;
+          }
+
+          .layer-item {
+            padding: 6px 8px;
+          }
+
+          .property-row {
+            flex-direction: column;
+            gap: 4px;
+          }
+
+          .property-value {
+            text-align: left;
+          }
+        }
+
+        /* Print styles */
+        @media print {
+          .map-viewer {
+            height: 100%;
+          }
+
+          .sidebar {
+            display: none;
+          }
+
+          .map-container {
+            width: 100%;
+            height: 100%;
+          }
+
+          .map-legend {
+            position: relative;
+            bottom: auto;
+            left: auto;
+            page-break-inside: avoid;
+          }
         }
       `}</style>
     </div>

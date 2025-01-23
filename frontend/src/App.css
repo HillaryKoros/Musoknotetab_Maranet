@@ -76,7 +76,7 @@
   font-size: 1.2rem;
   color: white !important;
   padding: 10px 15px;
-  border-radius: 5px;
+  border-radius: 2px;
   transition: all 0.3s ease;
 }
 
@@ -166,3 +166,17 @@
     max-height: 300px;
   }
 }
+
+.hover-shadow:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+}
+
+/* Active Navigation Styles */
+.nav-link.active {
+  color: #FFC107 !important;
+  background-color: rgba(255, 193, 7, 0.2);
+}
+
+
+

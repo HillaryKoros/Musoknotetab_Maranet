@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { MapContainer, TileLayer, WMSTileLayer, useMapEvents, Popup, useMap, LayersControl } from 'react-leaflet';
 import { Form, ListGroup } from 'react-bootstrap';
 import 'leaflet/dist/leaflet.css';
@@ -6,10 +6,6 @@ import L from 'leaflet';
 
 /********************************************************************************
  * MAP CONFIGURATION
- * Defines core map settings including:
- * - Initial map position and zoom level
- * - Geoserver WMS URL and configuration
- * - Popup display settings
  *******************************************************************************/
 const MAP_CONFIG = {
   initialPosition: [4.6818, 34.9911],
@@ -22,22 +18,7 @@ const MAP_CONFIG = {
 };
 
 /********************************************************************************
- * REST API ENDPOINTS
- * Collection of API endpoints for retrieving various impact assessment data
- *******************************************************************************/
-const REST_API_ENDPOINTS = {
-  affectedPop: 'http://127.0.0.1:8000/api/affectedPop/',
-  affectedGDP: 'http://127.0.0.1:8000/api/affectedGDP/',
-  affectedCrops: 'http://127.0.0.1:8000/api/affectedCrops/',
-  affectedRoads: 'http://127.0.0.1:8000/api/affectedRoads/',
-  displacedPop: 'http://127.0.0.1:8000/api/displacedPop/',
-  affectedLivestock: 'http://127.0.0.1:8000/api/affectedLivestock/',
-  affectedGrazingLand: 'http://127.0.0.1:8000/api/affectedGrazingLand/',
-};
-
-/********************************************************************************
  * LAYER CONFIGURATION
- * Utility function and layer definitions
  *******************************************************************************/
 const createWMSLayer = (name, layerId, queryable = true) => ({
   name,
@@ -47,7 +28,7 @@ const createWMSLayer = (name, layerId, queryable = true) => ({
 });
 
 const HAZARD_LAYERS = [
-  createWMSLayer('Inundation Map', 'flood_hazard_map_floodproofs_202501030000'),
+  createWMSLayer('Inundation Map', 'flood_hazard_map_floodproofs_202501210000'),
   createWMSLayer('Alerts Map', 'Alerts')
 ];
 
@@ -62,9 +43,14 @@ const IMPACT_LAYERS = [
   createWMSLayer('SectorData', 'Impact_sectordata')
 ];
 
+const BOUNDARY_LAYERS = [
+  createWMSLayer('Admin 1', 'gha_admin1'),
+  createWMSLayer('Admin 2', 'gha_admin2'),
+  createWMSLayer('Protected Areas', 'protected_areas')
+];
+
 /********************************************************************************
  * BASE MAP CONFIGURATION
- * Defines available base maps
  *******************************************************************************/
 const BASE_MAPS = [
   {
@@ -91,7 +77,6 @@ const BASE_MAPS = [
 
 /********************************************************************************
  * UTILITY FUNCTIONS
- * Helper functions for formatting
  *******************************************************************************/
 const formatFeatureValue = (value) => {
   if (typeof value === 'number') {
@@ -111,11 +96,35 @@ const getPropertyLabel = (key) => {
 
 /********************************************************************************
  * FEATURE INFO COMPONENTS
- * Components for displaying feature information
  *******************************************************************************/
 const FeatureInfoPopup = ({ info }) => {
   if (!info?.data?.length) return null;
-  
+
+  // Check if the data is for the sector
+  const isSectorData = info.data.some(feature => feature.properties.sector);
+
+  if (isSectorData) {
+    // Prepare data for the chart
+    const chartData = info.data.map(feature => ({
+      sector: feature.properties.sector,
+      value: feature.properties.value
+    }));
+
+    return (
+      <div className="feature-popup">
+        <h5 className="popup-title">Sector Data</h5>
+        <BarChart width={300} height={200} data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="sector" />
+          <YAxis />
+          <Tooltip />
+          <Legend />
+          <Bar dataKey="value" fill="#8884d8" />
+        </BarChart>
+      </div>
+    );
+  }
+
   return (
     <div className="feature-popup">
       <h5 className="popup-title">Layer Information</h5>
@@ -123,17 +132,23 @@ const FeatureInfoPopup = ({ info }) => {
         <div key={index} className="feature-details">
           {Object.entries(feature.properties)
             .filter(([key, value]) => (
-              value !== null && 
-              value !== undefined && 
-              !key.startsWith('_') && 
+              value !== null &&
+              value !== undefined &&
+              !key.startsWith('_') &&
               key !== 'bbox'
             ))
-            .map(([key, value]) => (
-              <div key={key} className="property-row">
-                <span className="property-label">{getPropertyLabel(key)}:</span>
-                <span className="property-value">{formatFeatureValue(value)}</span>
-              </div>
-            ))}
+            .map(([key, value]) => {
+              // Append m³/s to Q Thr1, Q Thr2, and Q Thr3 values
+              if (key === 'q_thr1' || key === 'q_thr2' || key === 'q_thr3') {
+                value = `${formatFeatureValue(value)} m³/s`;
+              }
+              return (
+                <div key={key} className="property-row">
+                  <span className="property-label">{getPropertyLabel(key)}:</span>
+                  <span className="property-value">{value}</span>
+                </div>
+              );
+            })}
         </div>
       ))}
     </div>
@@ -142,29 +157,28 @@ const FeatureInfoPopup = ({ info }) => {
 
 /********************************************************************************
  * MAP INTERACTION HANDLER
- * Manages map click events and feature information retrieval
  *******************************************************************************/
-const MapInteractionHandler = ({ selectedLayer, onFeatureClick }) => {
+const MapInteractionHandler = ({ selectedLayers, onFeatureClick }) => {
   const map = useMapEvents({
     click: async (e) => {
-      if (!selectedLayer) return;
-      
+      if (!selectedLayers.size) return;
+
       const { lat, lng } = e.latlng;
       const bounds = map.getBounds();
       const size = map.getSize();
       const point = map.latLngToContainerPoint(e.latlng);
-      
+
       const buffer = 8;
       const x = Math.round(point.x);
       const y = Math.round(point.y);
-      
+
       try {
         const params = new URLSearchParams({
           REQUEST: 'GetFeatureInfo',
           SERVICE: 'WMS',
           VERSION: '1.1.1',
-          LAYERS: selectedLayer,
-          QUERY_LAYERS: selectedLayer,
+          LAYERS: Array.from(selectedLayers).join(','),
+          QUERY_LAYERS: Array.from(selectedLayers).join(','),
           INFO_FORMAT: MAP_CONFIG.getFeatureInfoFormat,
           FEATURE_COUNT: '10',
           X: x.toString(),
@@ -177,12 +191,12 @@ const MapInteractionHandler = ({ selectedLayer, onFeatureClick }) => {
         });
 
         const getFeatureInfoUrl = `${MAP_CONFIG.geoserverWMSUrl}?${params.toString()}`;
-        
+
         const response = await fetch(getFeatureInfoUrl);
         if (!response.ok) throw new Error('GetFeatureInfo request failed');
-        
+
         const data = await response.json();
-        
+
         if (data.features?.length > 0) {
           onFeatureClick({
             location: { lat, lng },
@@ -194,27 +208,26 @@ const MapInteractionHandler = ({ selectedLayer, onFeatureClick }) => {
       }
     }
   });
-  
+
   return null;
 };
 
 /********************************************************************************
  * UI COMPONENTS
- * Reusable UI components
  *******************************************************************************/
-const LayerSelector = ({ title, layers, selectedLayer, onLayerSelect }) => (
+const LayerSelector = ({ title, layers, selectedLayers, onLayerSelect }) => (
   <div className="layer-selector">
     <h4>{title}</h4>
     <ListGroup className="mb-4">
       {layers.map((layer) => (
         <ListGroup.Item key={layer.name} className="layer-item">
           <Form.Check
-            type="radio"
+            type="checkbox"
             name="layerSelection"
             id={`layer-${layer.name}`}
             label={layer.name}
             onChange={() => onLayerSelect(layer)}
-            checked={selectedLayer === layer.layer}
+            checked={selectedLayers.has(layer.layer)}
           />
         </ListGroup.Item>
       ))}
@@ -231,20 +244,68 @@ const Legend = ({ legendUrl }) => (
 
 /********************************************************************************
  * MAIN MAP VIEWER COMPONENT
- * Core component that composes all map elements
  *******************************************************************************/
 const MapViewer = () => {
-  const [selectedLayer, setSelectedLayer] = useState(null);
+  const [selectedLayers, setSelectedLayers] = useState(new Set());
   const [activeLegend, setActiveLegend] = useState(null);
   const [popupInfo, setPopupInfo] = useState(null);
   const [mapKey, setMapKey] = useState(0);
 
   const handleLayerSelection = useCallback((layer) => {
-    setSelectedLayer(layer.layer);
-    setActiveLegend(layer.legend);
+    const newSelectedLayers = new Set(selectedLayers);
+
+    // Toggle the selected layer
+    if (newSelectedLayers.has(layer.layer)) {
+      newSelectedLayers.delete(layer.layer);
+    } else {
+      newSelectedLayers.add(layer.layer);
+    }
+
+    // If the selected layer is an Impact Layer (excluding SectorData), deselect all other layers
+    if (
+      IMPACT_LAYERS.some((impactLayer) => impactLayer.layer === layer.layer) &&
+      layer.layer !== IMPACT_LAYERS.find((l) => l.name === 'SectorData')?.layer
+    ) {
+      // Deselect all other layers except SectorData
+      HAZARD_LAYERS.forEach((hazardLayer) => {
+        if (newSelectedLayers.has(hazardLayer.layer)) {
+          newSelectedLayers.delete(hazardLayer.layer);
+        }
+      });
+      BOUNDARY_LAYERS.forEach((boundaryLayer) => {
+        if (newSelectedLayers.has(boundaryLayer.layer)) {
+          newSelectedLayers.delete(boundaryLayer.layer);
+        }
+      });
+      IMPACT_LAYERS.forEach((impactLayer) => {
+        if (impactLayer.layer !== layer.layer && newSelectedLayers.has(impactLayer.layer)) {
+          newSelectedLayers.delete(impactLayer.layer);
+        }
+      });
+    }
+
+    // If the selected layer is Inundation Map, deselect all Impact Layers (excluding SectorData)
+    if (HAZARD_LAYERS.some((hazardLayer) => hazardLayer.layer === layer.layer)) {
+      IMPACT_LAYERS.forEach((impactLayer) => {
+        if (
+          impactLayer.layer !== IMPACT_LAYERS.find((l) => l.name === 'SectorData')?.layer &&
+          newSelectedLayers.has(impactLayer.layer)
+        ) {
+          newSelectedLayers.delete(impactLayer.layer);
+        }
+      });
+    }
+
+    // If the selected layer is SectorData, allow it to be selected with Boundary Layers or Inundation Map
+    if (layer.layer === IMPACT_LAYERS.find((l) => l.name === 'SectorData')?.layer) {
+      // No additional logic needed here
+    }
+
+    setSelectedLayers(newSelectedLayers);
+    setActiveLegend(newSelectedLayers.has(layer.layer) ? layer.legend : null);
     setPopupInfo(null);
     setMapKey(prev => prev + 1);
-  }, []);
+  }, [selectedLayers]);
 
   const handleFeatureClick = useCallback((info) => {
     setPopupInfo(info);
@@ -256,14 +317,21 @@ const MapViewer = () => {
         <LayerSelector
           title="Inundation Map"
           layers={HAZARD_LAYERS}
-          selectedLayer={selectedLayer}
+          selectedLayers={selectedLayers}
           onLayerSelect={handleLayerSelection}
         />
-        
+
         <LayerSelector
           title="Impact Layers"
           layers={IMPACT_LAYERS}
-          selectedLayer={selectedLayer}
+          selectedLayers={selectedLayers}
+          onLayerSelect={handleLayerSelection}
+        />
+
+        <LayerSelector
+          title="Boundary Layers"
+          layers={BOUNDARY_LAYERS}
+          selectedLayers={selectedLayers}
           onLayerSelect={handleLayerSelection}
         />
       </div>
@@ -275,41 +343,42 @@ const MapViewer = () => {
           scrollWheelZoom={true}
           style={{ height: '100%', width: '100%' }}
         >
-          <MapInteractionHandler 
-            selectedLayer={selectedLayer}
+          <MapInteractionHandler
+            selectedLayers={selectedLayers}
             onFeatureClick={handleFeatureClick}
           />
-          
+
           <LayersControl position="topright">
             {BASE_MAPS.map((basemap) => (
-              <LayersControl.BaseLayer 
-                key={basemap.name} 
+              <LayersControl.BaseLayer
+                key={basemap.name}
                 name={basemap.name}
                 checked={basemap.name === 'ICPAC'}
               >
-                <TileLayer 
-                  url={basemap.url} 
-                  attribution={basemap.attribution} 
+                <TileLayer
+                  url={basemap.url}
+                  attribution={basemap.attribution}
                 />
               </LayersControl.BaseLayer>
             ))}
 
-            {selectedLayer && (
-              <LayersControl.Overlay 
-                checked={true} 
-                name={selectedLayer.split(':')[1]}
+            {Array.from(selectedLayers).map((layer) => (
+              <LayersControl.Overlay
+                key={layer}
+                checked={true}
+                name={layer.split(':')[1] || 'Custom Layer'}
               >
                 <WMSTileLayer
                   key={`wms-${mapKey}`}
                   url={MAP_CONFIG.geoserverWMSUrl}
-                  layers={selectedLayer}
+                  layers={layer}
                   format="image/png"
                   transparent={true}
                   attribution="GeoServer"
                   version="1.1.1"
                 />
               </LayersControl.Overlay>
-            )}
+            ))}
           </LayersControl>
 
           {popupInfo && (

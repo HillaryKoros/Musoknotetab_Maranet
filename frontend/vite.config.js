@@ -14,23 +14,23 @@ export default defineConfig({
   // Server and proxy configuration
   server: {
     proxy: {
-      // Geoserver proxy
-      '/geoserver': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        secure: false,
-      },
-      // Django backend proxy
-      '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/admin': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        secure: false,
-      }
+      // // Geoserver proxy
+      // '/geoserver': {
+      //   target: 'http://localhost:8080',
+      //   changeOrigin: true,
+      //   secure: false,
+      // },
+      // // Django backend proxy
+      // '/api': {
+      //   target: 'http://localhost:8000',
+      //   changeOrigin: true,
+      //   secure: false,
+      // },
+      // '/admin': {
+      //   target: 'http://localhost:8000',
+      //   changeOrigin: true,
+      //   secure: false,
+      // }
     }
   },
   

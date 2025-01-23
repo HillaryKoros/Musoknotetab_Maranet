@@ -1,10 +1,14 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
 import { Navbar, Container, Nav } from 'react-bootstrap';
 import Home from './components/Home';
 import MapViewer from './components/MapViewer';
 import Reports from './components/Reports';
 import Analysis from './components/Analysis';
+import Indicators from './components/Indicators';
+import About from './components/About';
+import Partners from './components/Partners';
+import Contact from './components/Contact';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
@@ -52,11 +56,11 @@ const App = () => {
             
             <Navbar.Collapse id="basic-navbar-nav">
               <Nav className="mx-auto" style={{ gap: '1.5rem' }}>
-                <Nav.Link as={Link} to="/" className="nav-link" style={{ color: '#fff' }}>
+                <Nav.Link as={NavLink} to="/" className="nav-link" style={{ color: '#fff' }}>
                   HOME
                 </Nav.Link>
                 <Nav.Link 
-                  as={Link} 
+                  as={NavLink} 
                   to="/map" 
                   className="nav-link" 
                   style={{ 
@@ -68,34 +72,34 @@ const App = () => {
                 >
                   MAPVIEWER
                 </Nav.Link>
-                <Nav.Link as={Link} to="/reports" className="nav-link" style={{ color: '#fff' }}>
+                <Nav.Link as={NavLink} to="/reports" className="nav-link" style={{ color: '#fff' }}>
                   REPORTS
                 </Nav.Link>
-                <Nav.Link as={Link} to="/analysis" className="nav-link" style={{ color: '#fff' }}>
+                <Nav.Link as={NavLink} to="/analysis" className="nav-link" style={{ color: '#fff' }}>
                   ANALYSIS
                 </Nav.Link>
-                <Nav.Link as={Link} to="/indicators" className="nav-link" style={{ color: '#fff' }}>
+                <Nav.Link as={NavLink} to="/indicators" className="nav-link" style={{ color: '#fff' }}>
                   FLOOD INDICATORS
                 </Nav.Link>
-                <Nav.Link as={Link} to="/about" className="nav-link" style={{ color: '#fff' }}>
+                <Nav.Link as={NavLink} to="/about" className="nav-link" style={{ color: '#fff' }}>
                   ABOUT
                 </Nav.Link>
-                <Nav.Link as={Link} to="/partners" className="nav-link" style={{ color: '#fff' }}>
+                <Nav.Link as={NavLink} to="/partners" className="nav-link" style={{ color: '#fff' }}>
                   PARTNERS
                 </Nav.Link>
-                <Nav.Link as={Link} to="/contact" className="nav-link" style={{ color: '#fff' }}>
+                <Nav.Link as={NavLink} to="/contact" className="nav-link" style={{ color: '#fff' }}>
                   CONTACT US
                 </Nav.Link>
               </Nav>
             </Navbar.Collapse>
 
-            {/* Right Logo */}
+            {/* Right Logo
             <img
               src="/src/assets/cima_research_foundation_logo.jpg"
               alt="Right Logo"
               className="navbar-logo"
               style={{ height: '100px' }}
-            />
+            /> */}
           </Container>
         </Navbar>
 
@@ -106,10 +110,10 @@ const App = () => {
             <Route path="/map" element={<MapViewer />} />
             <Route path="/reports" element={<Reports />} />
             <Route path="/analysis" element={<Analysis />} />
-            <Route path="/indicators" element={<div>Flood Indicators</div>} />
-            <Route path="/about" element={<div>About</div>} />
-            <Route path="/partners" element={<div>Partners</div>} />
-            <Route path="/contact" element={<div>Contact Us</div>} />
+            <Route path="/indicators" element={<Indicators/>} />
+            <Route path="/about" element={<About/>} />
+            <Route path="/partners" element={<Partners/>} />
+            <Route path="/contact" element={<Contact/>} />
           </Routes>
         </div>
 

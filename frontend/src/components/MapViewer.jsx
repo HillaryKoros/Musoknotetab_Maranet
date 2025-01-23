@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { MapContainer, TileLayer, WMSTileLayer, useMapEvents, Popup, useMap, LayersControl } from 'react-leaflet';
+import React, { useState, useCallback, useEffect } from 'react';
+import { MapContainer, TileLayer, WMSTileLayer, useMapEvents, Popup, useMap, LayersControl, GeoJSON } from 'react-leaflet';
 import { Form, ListGroup } from 'react-bootstrap';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -250,6 +250,15 @@ const MapViewer = () => {
   const [activeLegend, setActiveLegend] = useState(null);
   const [popupInfo, setPopupInfo] = useState(null);
   const [mapKey, setMapKey] = useState(0);
+  const [geoJsonData, setGeoJsonData] = useState(null);
+
+  // Load GeoJSON data from the file
+  useEffect(() => {
+    fetch('/assets/merged_data.geojson')
+      .then((response) => response.json())
+      .then((data) => setGeoJsonData(data))
+      .catch((error) => console.error('Error loading GeoJSON data:', error));
+  }, []);
 
   const handleLayerSelection = useCallback((layer) => {
     const newSelectedLayers = new Set(selectedLayers);
@@ -310,6 +319,24 @@ const MapViewer = () => {
   const handleFeatureClick = useCallback((info) => {
     setPopupInfo(info);
   }, []);
+
+  // Style for GeoJSON features
+  const geoJsonStyle = {
+    color: "#ff7800",
+    weight: 2,
+    opacity: 1,
+    fillOpacity: 0.7
+  };
+
+  // Function to handle click on GeoJSON features
+  const onEachFeature = (feature, layer) => {
+    if (feature.properties) {
+      const popupContent = Object.entries(feature.properties)
+        .map(([key, value]) => `<div><strong>${key}:</strong> ${value}</div>`)
+        .join('');
+      layer.bindPopup(popupContent);
+    }
+  };
 
   return (
     <div className="map-viewer">
@@ -379,6 +406,21 @@ const MapViewer = () => {
                 />
               </LayersControl.Overlay>
             ))}
+
+            {/* Add GeoJSON Layer */}
+            {geoJsonData && (
+              <LayersControl.Overlay
+                key="geojson-layer"
+                checked={true}
+                name="Merged Data"
+              >
+                <GeoJSON
+                  data={geoJsonData}
+                  style={geoJsonStyle}
+                  onEachFeature={onEachFeature}
+                />
+              </LayersControl.Overlay>
+            )}
           </LayersControl>
 
           {popupInfo && (

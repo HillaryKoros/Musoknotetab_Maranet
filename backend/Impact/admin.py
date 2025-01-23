@@ -2,7 +2,7 @@ from django.contrib import admin
 from leaflet.admin import LeafletGeoAdmin
 from .models import (
     AffectedGrazingLand, AffectedPopulation, ImpactedGDP, AffectedCrops,
-    AffectedLivestock, AffectedRoads, DisplacedPopulation,SectorData,SectorForecast,WaterBodies
+    AffectedLivestock, AffectedRoads, DisplacedPopulation,SectorData,SectorForecast,WaterBodies,RiverSection
 )
 
 class BaseImpactAdmin(LeafletGeoAdmin):
@@ -52,8 +52,12 @@ class SectorForecastAdmin(BaseImpactAdmin):
     list_display = ['sector', 'model_type', 'time_point']
     search_fields = ['sector', 'model_type', 'time_point']
 
-
 @admin.register(WaterBodies)
 class WaterBodiesAdmin(BaseImpactAdmin):
     list_display = ['name_of_wa', 'type_of_wa']
-    search_fields = ['name_of_wa', 'type_of_wa','geometry']
+
+@admin.register(RiverSection)
+class RiverSectionAdmin(BaseImpactAdmin):
+    list_display = ['sec_name', 'basin', 'latitude', 'longitude']
+    search_fields = ['sec_name', 'basin']
+    list_filter = ['basin']

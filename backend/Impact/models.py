@@ -1,7 +1,7 @@
 
 # from django.db import models
 from django.contrib.gis.db import models 
-
+from django.db import models as django_models
 
 # Create your models here.
 # 1. Create a model named affected_population that has the following fields:
@@ -205,3 +205,34 @@ class WaterBodies(models.Model):
 
     class Meta:
         verbose_name_plural = "WaterBodies"
+
+
+
+class RiverSection(models.Model):
+    section_name = models.CharField(max_length=100)
+    time_restart = models.DateTimeField()
+    time_run = models.DateTimeField()
+    time_start = models.DateTimeField()
+    time_series_discharge_simulated_gfs = models.TextField()
+    time_series_discharge_simulated_icon = models.TextField()
+    time_period = models.TextField()
+    sec_code = models.IntegerField()
+    sec_name = models.CharField(max_length=100)
+    basin = models.CharField(max_length=50)
+    domain = models.CharField(max_length=50)
+    area = models.FloatField()
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    q_thr1 = models.FloatField()
+    q_thr2 = models.FloatField()
+    q_thr3 = models.FloatField()
+    category = models.CharField(max_length=50, null=True, blank=True)
+    geometry = models.PointField(srid=4326)
+
+    def __str__(self):
+        return self.section_name
+
+    
+    class Meta:
+        verbose_name_plural = "RiverSections"
+    

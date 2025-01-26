@@ -3,13 +3,13 @@
 
 # Ignore environment variables
 .env
-
+env/
 # Ignore compiled files
 *.pyc
-*. __pycache__/
+__pycache__/
 
 # Ignore Django migrations
-*/migrations/*
+migrations/
 
 # Ignore media files
 media/
@@ -21,3 +21,5 @@ media/
 # Ignore system files
 .DS_Store
 Thumbs.db
+
+node_modules/

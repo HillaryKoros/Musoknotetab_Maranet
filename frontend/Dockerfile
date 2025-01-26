@@ -1,0 +1,29 @@
+# Stage 1: Dependencies
+FROM node:18-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci 
+
+# Stage 2: Builder
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .  
+RUN npm run build  
+
+# Stage 3: Production
+FROM nginx:alpine AS production
+# Copy the built files from the builder stage to Nginx's html directory
+COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy custom Nginx configuration file (Make sure this file exists in your project)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80  
+CMD ["nginx", "-g", "daemon off;"]
+
+# Stage 4: Development (For Hot-Reloading)
+FROM node:18-alpine AS development
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .  
+EXPOSE 5173  
+CMD ["npm", "run", "dev"] 

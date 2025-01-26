@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # Web service (Django backend)
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/mediafiles
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5433
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DEBUG=1
+      - SECRET_KEY=${SECRET_KEY}
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+      - DJANGO_SETTINGS_MODULE=flood_watch_system.settings
+      - SFTP_HOST=${SFTP_HOST}
+      - SFTP_PORT=${SFTP_PORT}
+      - SFTP_USERNAME=${SFTP_USERNAME}
+      - SFTP_PASSWORD=${SFTP_PASSWORD}
+      - REMOTE_FOLDER_BASE=${REMOTE_FOLDER_BASE}
+      - JSON_REMOTE_DIR=${JSON_REMOTE_DIR}
+      - SHAPEFILE_REMOTE_DIR='/home/floodproofs/fp-eastafrica/storage/static_data/'
+    depends_on:
+      - db
+      - redis
+      - geoserver
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # PostgreSQL service with local data directory binding
+  db:
+    image: geonode/postgis:latest
+    container_name: postgis
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    volumes:
+      # Bind the local PostgreSQL data directory to the container
+      - /var/lib/postgresql/17/main:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Redis service
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # GeoServer service
+  geoserver:
+    image: kartoza/geoserver:latest
+    container_name: geoserver
+    ports:
+      - "8080:8080"
+    volumes:
+      # Bind local data and style directories to GeoServer container
+      - /home/koros/geoserver/data_dir:/opt/geoserver/data_dir
+      - /home/koros/geoserver/data_dir/styles:/opt/geoserver/styles
+    environment:
+      - GEOSERVER_PASSWORD=${GEOSERVER_PASSWORD}
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # Frontend service (React/Vite)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "5173:80"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - VITE_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - web
+    networks:
+      - app-network
+
+# Define the network for the services to communicate with each other
+networks:
+  app-network:
+    driver: bridge
+
+# Define persistent volumes for static and media files, as well as GeoServer
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
+  geoserver_data:
+  geoserver_styles:

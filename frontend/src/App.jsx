@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-do
 import { Navbar, Container, Nav } from 'react-bootstrap';
 import Home from './components/Home';
 import MapViewer from './components/MapViewer';
-import Reports from './components/Reports';
 import Analysis from './components/Analysis';
 import Indicators from './components/Indicators';
 import About from './components/About';
@@ -28,27 +27,45 @@ const App = () => {
           }}
         >
           <Container fluid>
-            {/* Left Logo */}
-            <div className="d-flex align-items-center">
-              <img
-                src={leftLogo}
-                alt="Left Logo"
-                className="navbar-logo me-3"
-                style={{ height: '100px' }}
-              />
-              <div className="brand-container">
-                <div className="brand-text">
-                  <span className="text-uppercase" style={{ fontSize: '0.9rem', color: '#fff' }}>
-                    East Africa
+            <div className="brand-container">
+              <div className="brand-text" style={{
+                padding: '8px 12px',
+                border: '2px solid #FFC107',
+                borderRadius: '4px',
+                display: 'inline-block',
+                background: 'rgba(0,0,0,0.2)'
+              }}>
+                <span style={{ 
+                  display: 'block',
+                  fontSize: '0.9rem',
+                  color: '#fff',
+                  letterSpacing: '1px',
+                  textTransform: 'uppercase',
+                  marginBottom: '4px'
+                }}>
+                  EAST AFRICA
+                </span>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <span style={{ 
+                    color: '#FFC107',
+                    fontWeight: 'bold',
+                    fontSize: '1.4rem',
+                    letterSpacing: '1.5px'
+                  }}>
+                    FLOOD
                   </span>
-                  <div className="flood-watch">
-                    <span style={{ color: '#FFC107', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                      FLOOD
-                    </span>
-                    <span style={{ color: '#fff', fontWeight: 'bold', fontSize: '1.2rem', marginLeft: '8px' }}>
-                      WATCH
-                    </span>
-                  </div>
+                  <span style={{ 
+                    color: '#fff',
+                    fontWeight: 'bold',
+                    fontSize: '1.4rem',
+                    letterSpacing: '1.5px'
+                  }}>
+                    WATCH
+                  </span>
                 </div>
               </div>
             </div>
@@ -73,9 +90,6 @@ const App = () => {
                 >
                   MAPVIEWER
                 </Nav.Link>
-                <Nav.Link as={NavLink} to="/reports" className="nav-link" style={{ color: '#fff' }}>
-                  REPORTS
-                </Nav.Link>
                 <Nav.Link as={NavLink} to="/analysis" className="nav-link" style={{ color: '#fff' }}>
                   ANALYSIS
                 </Nav.Link>
@@ -94,22 +108,21 @@ const App = () => {
               </Nav>
             </Navbar.Collapse>
 
-            {/* Right Logo
-            <img
-              src="/src/assets/cima_research_foundation_logo.jpg"
-              alt="Right Logo"
-              className="navbar-logo"
-              style={{ height: '100px' }}
-            /> */}
+            <div className="d-flex align-items-center">
+              <img
+                src={leftLogo}
+                alt="ICPAC Logo"
+                className="navbar-logo ms-3"
+                style={{ height: '100px' }}
+              />
+            </div>
           </Container>
         </Navbar>
 
-        {/* Main Routes */}
         <div className="main-content">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/map" element={<MapViewer />} />
-            <Route path="/reports" element={<Reports />} />
             <Route path="/analysis" element={<Analysis />} />
             <Route path="/indicators" element={<Indicators/>} />
             <Route path="/about" element={<About/>} />

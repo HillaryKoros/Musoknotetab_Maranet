@@ -1,182 +1,103 @@
-/* Layout Structure */
 .app-wrapper {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-}
-
-.app-container {
-  display: flex;
-  height: calc(100vh - 100px); /* Account for navbar height */
-  width: 100%;
-}
-
-/* Sidebar Styles */
-.sidebar {
-  width: 300px;
-  padding: 20px;
-  background: white;
-  overflow-y: auto;
-  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-  z-index: 1000;
-}
-
-/* Map Styles */
-.map-container {
-  flex: 1;
-  position: relative;
-}
-
-.map-legend {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 10px;
-  border-radius: 5px;
-  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
-  font-size: 14px;
-  z-index: 1000;
-}
-
-.map-legend h4 {
-  margin: 0 0 5px;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-}
-
-.legend-item i {
-  width: 18px;
-  height: 18px;
-  margin-right: 8px;
-  display: inline-block;
-  border: 1px solid black;
 }
 
 /* Navbar Styles */
 .navbar-custom {
   background-color: #115803;
   border-bottom: 2px solid #228B22;
-  height: 100px;
-  display: flex;
-  align-items: center;
-  padding: 0 30px;
+  height: 80px;
+  padding: 0 20px;
 }
 
-.navbar-custom .navbar-brand {
-  font-size: 1.2rem;
-  color: white !important;
-  font-weight: bold;
-}
-
-.navbar-custom .nav-link {
-  font-size: 1.2rem;
-  color: white !important;
-  padding: 10px 15px;
-  border-radius: 2px;
-  transition: all 0.3s ease;
-}
-
-.navbar-custom .nav-link:hover {
-  color: #ffc107 !important;
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.navbar-custom .nav-item {
-  margin: 0 40px;
-}
-
-.navbar-custom .navbar-toggler {
-  font-size: 1.2rem;
-  padding: 10px;
-}
-
-/* Logo and Brand Styles */
 .navbar-logo {
-  height: 50px;
+  height: 60px;
   width: auto;
 }
 
 .brand-container {
-  margin-left: 1rem;
+  margin-right: 20px;
 }
 
 .brand-text {
   display: flex;
   flex-direction: column;
   line-height: 1.2;
-}
-
-.brand-text span {
-  font-weight: bold;
+  padding: 8px 12px;
+  border: 2px solid #FFC107;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.2);
 }
 
 .flood-watch {
   display: flex;
   align-items: center;
+  gap: 8px;
 }
 
-/* Utility Classes */
-.text-warning {
-  color: #ffc107 !important;
+/* Navigation Links */
+.nav-link {
+  font-size: 0.9rem !important;
+  padding: 8px 12px !important;
+  color: white !important;
+  transition: all 0.3s ease;
 }
 
-.text-white {
-  color: #ffffff !important;
+.nav-link:hover {
+  color: #FFC107 !important;
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
-/* List Group Styles */
-.list-group-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.nav-link.active {
+  color: #FFC107 !important;
+  background-color: #2E7D32;
+  border-radius: 4px;
 }
 
-.spinner-border {
-  margin-left: auto;
+/* Main Content */
+.main-content {
+  flex: 1;
+  padding: 20px;
+  padding-bottom: 60px;
 }
 
-/* Footer Styles */
+/* Footer */
 .footer-custom {
   background-color: #115803;
   color: white;
+  padding: 0.8rem;
   text-align: center;
-  padding: 1rem;
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  z-index: 1001; /* Ensure footer stays above map */
+  font-size: 0.9rem;
 }
 
-/* Responsive Adjustments */
+/* Responsive Design */
 @media (max-width: 991.98px) {
-  .navbar-custom .nav-item {
-    margin: 10px 0;
+  .navbar-custom {
+    height: auto;
+    padding: 10px;
   }
-  
-  .app-container {
-    flex-direction: column;
+
+  .navbar-logo {
+    height: 50px;
   }
-  
-  .sidebar {
-    width: 100%;
-    max-height: 300px;
+
+  .nav-link {
+    padding: 6px 10px !important;
+  }
+
+  .brand-text {
+    padding: 6px 10px;
   }
 }
 
-.hover-shadow:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 4px 15px rgba(0,0,0,0.1) !important;
+@media (max-width: 768px) {
+  .navbar-custom .navbar-nav {
+    gap: 0.5rem !important;
+  }
+
+  .brand-container {
+    margin-right: 10px;
+  }
 }
-
-/* Active Navigation Styles */
-.nav-link.active {
-  color: #FFC107 !important;
-  background-color: rgba(255, 193, 7, 0.2);
-}
-
-
-

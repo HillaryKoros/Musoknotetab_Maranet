@@ -9,6 +9,7 @@ import Indicators from './components/Indicators';
 import About from './components/About';
 import Partners from './components/Partners';
 import Contact from './components/Contact';
+import leftLogo from '@assets/ICPAC_Website_Header_Logo.svg';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
@@ -30,7 +31,7 @@ const App = () => {
             {/* Left Logo */}
             <div className="d-flex align-items-center">
               <img
-                src="src/assets/ICPAC_Website_Header_Logo.svg"
+                src={leftLogo}
                 alt="Left Logo"
                 className="navbar-logo me-3"
                 style={{ height: '100px' }}

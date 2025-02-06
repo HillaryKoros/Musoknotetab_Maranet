@@ -9,12 +9,15 @@ logs/
 *.njsproj
 *.sln
 *.sw?
+*.bak
+*.tmp
 
 # Environment variables and virtual environments
 .env
+.env.*
 env/
-venv
-frontend/node_modules/
+venv/
+.venv/
 
 # Compiled files and caches
 *.pyc
@@ -23,21 +26,27 @@ frontend/node_modules/
 __pycache__/
 
 # Django-specific exclusions
-*.migrations/
+**/migrations/
 media/
+staticfiles/
+db.sqlite3
+*.pot
 
 # Node.js-specific exclusions
 node_modules/
 dist/
 dist-ssr/
+.parcel-cache/
 
 # IDE and editor-specific exclusions
 .vscode/
 !.vscode/extensions.json
 .idea/
+.idea/workspace.xml
+.idea/tasks.xml
 
 # Data files (backend-specific)
 backend/data/
 temp_data/
 temp_rasters/
-migrations/
+uploads/

@@ -4,15 +4,17 @@
 *.pyd
 __pycache__/
 *.env
+.env
+.env.*
 *.venv
 venv/
-.env
 env/
 
 # Django-specific files
 db.sqlite3
 media/
 static/
+staticfiles/
 *.log
 *.tmp
 *.bak
@@ -22,21 +24,26 @@ static/
 node_modules/
 dist/
 build/
+.parcel-cache/
 
 # Ignore temporary files and directories
 *.swp
 *.swo
 *.tmp
 *.bak
+*.~
 .DS_Store
 
 # Ignore IDE/editor config files
 .vscode/
 .idea/
+*.sublime-*
 
 # Ignore Git metadata
-.git
+.git/
 .gitignore
+.gitattributes
+.github/
 
 # Docker-related files
 Dockerfile

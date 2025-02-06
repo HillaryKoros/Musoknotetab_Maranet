@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { MapContainer, TileLayer, WMSTileLayer, useMapEvents, Popup, useMap, LayersControl, GeoJSON } from 'react-leaflet';
+import { MapContainer, TileLayer, WMSTileLayer, useMapEvents, useMap, LayersControl, GeoJSON, Popup } from 'react-leaflet';
 import { Form, ListGroup } from 'react-bootstrap';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -10,11 +11,24 @@ import L from 'leaflet';
 const MAP_CONFIG = {
   initialPosition: [4.6818, 34.9911],
   initialZoom: 5,
-  geoserverWMSUrl: "http://localhost:8080/geoserver/floodwatch/wms",
+  geoserverWMSUrl: "http://127.0.0.1:8093/geoserver/floodwatch/wms",
   getFeatureInfoFormat: 'application/json',
   popupWidth: 300,
   popupMaxHeight: 400,
   popupOffset: [0, -10]
+};
+
+const MONITORING_STATIONS_CONFIG = {
+  name: 'Monitoring Stations',
+  style: {
+    radius: 8,
+    fillColor: "#3388ff",
+    color: "#fff",
+    weight: 1,
+    opacity: 1,
+    fillOpacity: 0.8,
+    selectedFillColor: "#ff4444"
+  }
 };
 
 /********************************************************************************
@@ -28,7 +42,7 @@ const createWMSLayer = (name, layerId, queryable = true) => ({
 });
 
 const HAZARD_LAYERS = [
-  createWMSLayer('Inundation Map', 'flood_hazard_map_floodproofs_202501210000'),
+  createWMSLayer('Inundation Map', 'flood_hazard_20250204'),
   createWMSLayer('Alerts Map', 'Alerts')
 ];
 
@@ -49,9 +63,6 @@ const BOUNDARY_LAYERS = [
   createWMSLayer('Protected Areas', 'protected_areas')
 ];
 
-/********************************************************************************
- * BASE MAP CONFIGURATION
- *******************************************************************************/
 const BASE_MAPS = [
   {
     name: 'ICPAC',
@@ -76,144 +87,101 @@ const BASE_MAPS = [
 ];
 
 /********************************************************************************
- * UTILITY FUNCTIONS
+ * STATION INFO COMPONENT
  *******************************************************************************/
-const formatFeatureValue = (value) => {
-  if (typeof value === 'number') {
-    return value.toLocaleString(undefined, {
-      maximumFractionDigits: 6
-    });
-  }
-  return value?.toString() || 'N/A';
-};
-
-const getPropertyLabel = (key) => {
-  return key
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-};
-
-/********************************************************************************
- * FEATURE INFO COMPONENTS
- *******************************************************************************/
-const FeatureInfoPopup = ({ info }) => {
-  if (!info?.data?.length) return null;
-
-  // Check if the data is for the sector
-  const isSectorData = info.data.some(feature => feature.properties.sector);
-
-  if (isSectorData) {
-    // Prepare data for the chart
-    const chartData = info.data.map(feature => ({
-      sector: feature.properties.sector,
-      value: feature.properties.value
-    }));
-
-    return (
-      <div className="feature-popup">
-        <h5 className="popup-title">Sector Data</h5>
-        <BarChart width={300} height={200} data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="sector" />
-          <YAxis />
-          <Tooltip />
-          <Legend />
-          <Bar dataKey="value" fill="#8884d8" />
-        </BarChart>
-      </div>
-    );
-  }
+const StationInfo = ({ feature }) => {
+  if (!feature?.properties) return null;
+  const props = feature.properties;
 
   return (
-    <div className="feature-popup">
-      <h5 className="popup-title">Layer Information</h5>
-      {info.data.map((feature, index) => (
-        <div key={index} className="feature-details">
-          {Object.entries(feature.properties)
-            .filter(([key, value]) => (
-              value !== null &&
-              value !== undefined &&
-              !key.startsWith('_') &&
-              key !== 'bbox'
-            ))
-            .map(([key, value]) => {
-              // Append m³/s to Q Thr1, Q Thr2, and Q Thr3 values
-              if (key === 'q_thr1' || key === 'q_thr2' || key === 'q_thr3') {
-                value = `${formatFeatureValue(value)} m³/s`;
-              }
-              return (
-                <div key={key} className="property-row">
-                  <span className="property-label">{getPropertyLabel(key)}:</span>
-                  <span className="property-value">{value}</span>
-                </div>
-              );
-            })}
+    <div className="station-info-overlay">
+      <h5>{props.SEC_NAME}</h5>
+      <div className="station-details">
+        <div><strong>Basin:</strong> {props.BASIN}</div>
+        <div><strong>Area:</strong> {`${props.AREA} km²`}</div>
+        <div><strong>Location:</strong> {`${props.latitude?.toFixed(4)}°N, ${props.longitude?.toFixed(4)}°E`}</div>
+      </div>
+      
+      <div className="threshold-info">
+        <div className="alert">
+          <strong>Alert:</strong> {props.Q_THR1} m³/s
         </div>
-      ))}
+        <div className="alarm">
+          <strong>Alarm:</strong> {props.Q_THR2} m³/s
+        </div>
+        <div className="emergency">
+          <strong>Emergency:</strong> {props.Q_THR3} m³/s
+        </div>
+      </div>
     </div>
   );
 };
 
 /********************************************************************************
- * MAP INTERACTION HANDLER
+ * DISCHARGE CHART COMPONENT
  *******************************************************************************/
-const MapInteractionHandler = ({ selectedLayers, onFeatureClick }) => {
-  const map = useMapEvents({
-    click: async (e) => {
-      if (!selectedLayers.size) return;
+const DischargeChart = ({ timeSeriesData }) => {
+  if (!timeSeriesData || timeSeriesData.length === 0) return null;
 
-      const { lat, lng } = e.latlng;
-      const bounds = map.getBounds();
-      const size = map.getSize();
-      const point = map.latLngToContainerPoint(e.latlng);
-
-      const buffer = 8;
-      const x = Math.round(point.x);
-      const y = Math.round(point.y);
-
-      try {
-        const params = new URLSearchParams({
-          REQUEST: 'GetFeatureInfo',
-          SERVICE: 'WMS',
-          VERSION: '1.1.1',
-          LAYERS: Array.from(selectedLayers).join(','),
-          QUERY_LAYERS: Array.from(selectedLayers).join(','),
-          INFO_FORMAT: MAP_CONFIG.getFeatureInfoFormat,
-          FEATURE_COUNT: '10',
-          X: x.toString(),
-          Y: y.toString(),
-          BUFFER: buffer.toString(),
-          BBOX: bounds.toBBoxString(),
-          WIDTH: size.x.toString(),
-          HEIGHT: size.y.toString(),
-          SRS: 'EPSG:4326'
-        });
-
-        const getFeatureInfoUrl = `${MAP_CONFIG.geoserverWMSUrl}?${params.toString()}`;
-
-        const response = await fetch(getFeatureInfoUrl);
-        if (!response.ok) throw new Error('GetFeatureInfo request failed');
-
-        const data = await response.json();
-
-        if (data.features?.length > 0) {
-          onFeatureClick({
-            location: { lat, lng },
-            data: data.features
-          });
-        }
-      } catch (error) {
-        console.error('GetFeatureInfo error:', error);
-      }
-    }
-  });
-
-  return null;
+  return (
+    <div className="discharge-chart">
+      <ResponsiveContainer width="100%" height={200}>
+        <LineChart
+          data={timeSeriesData}
+          margin={{ top: 5, right: 20, left: 40, bottom: 35 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis
+            dataKey="time"
+            tick={{ fontSize: 10 }}
+            angle={-45}
+            textAnchor="end"
+            height={60}
+            interval={0}
+          />
+          <YAxis
+            label={{ 
+              value: 'Discharge (m³/s)',
+              angle: -90,
+              position: 'insideLeft',
+              style: { fontSize: 12 }
+            }}
+          />
+          <Tooltip 
+            formatter={(value) => [`${value.toFixed(2)} m³/s`]}
+            labelFormatter={(label) => `Date: ${label}`}
+          />
+          <RechartsLegend
+            verticalAlign="bottom"
+            height={36}
+            wrapperStyle={{
+              paddingTop: '10px',
+              paddingBottom: '10px',
+              borderTop: '1px solid #eee'
+            }}
+          />
+          <Line
+            type="monotone"
+            dataKey="gfs"
+            stroke="#4169E1"
+            name="GFS Forecast"
+            dot={false}
+          />
+          <Line
+            type="monotone"
+            dataKey="icon"
+            stroke="#32CD32"
+            name="ICON Forecast"
+            dot={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
 };
 
 /********************************************************************************
- * UI COMPONENTS
+ * LAYER SELECTOR COMPONENT
  *******************************************************************************/
 const LayerSelector = ({ title, layers, selectedLayers, onLayerSelect }) => (
   <div className="layer-selector">
@@ -235,12 +203,88 @@ const LayerSelector = ({ title, layers, selectedLayers, onLayerSelect }) => (
   </div>
 );
 
-const Legend = ({ legendUrl }) => (
+/********************************************************************************
+ * MAP LEGEND COMPONENT
+ *******************************************************************************/
+const MapLegend = ({ legendUrl }) => (
   <div className="map-legend">
     <h5>Legend</h5>
     <img src={legendUrl} alt="Legend" onError={(e) => e.target.style.display = 'none'} />
   </div>
 );
+
+/********************************************************************************
+ * FEATURE POPUP COMPONENT
+ *******************************************************************************/
+const FeaturePopup = ({ feature }) => {
+  if (!feature?.properties) return null;
+
+  return (
+    <Popup>
+      <div className="feature-popup">
+        {Object.entries(feature.properties)
+          .filter(([key]) => !key.startsWith('_'))
+          .map(([key, value]) => (
+            <div key={key} className="popup-row">
+              <strong>{key}:</strong> {value}
+            </div>
+          ))}
+      </div>
+    </Popup>
+  );
+};
+
+/********************************************************************************
+ * MAP INTERACTION HANDLER
+ *******************************************************************************/
+const MapInteractionHandler = ({ selectedLayers, onFeatureClick }) => {
+  const map = useMapEvents({
+    click: async (e) => {
+      if (!selectedLayers.size) return;
+
+      const { lat, lng } = e.latlng;
+      const bounds = map.getBounds();
+      const size = map.getSize();
+      const point = map.latLngToContainerPoint(e.latlng);
+
+      try {
+        const params = new URLSearchParams({
+          REQUEST: 'GetFeatureInfo',
+          SERVICE: 'WMS',
+          VERSION: '1.1.1',
+          LAYERS: Array.from(selectedLayers).join(','),
+          QUERY_LAYERS: Array.from(selectedLayers).join(','),
+          INFO_FORMAT: MAP_CONFIG.getFeatureInfoFormat,
+          FEATURE_COUNT: '10',
+          X: Math.round(point.x).toString(),
+          Y: Math.round(point.y).toString(),
+          BUFFER: '8',
+          BBOX: bounds.toBBoxString(),
+          WIDTH: size.x.toString(),
+          HEIGHT: size.y.toString(),
+          SRS: 'EPSG:4326'
+        });
+
+        const getFeatureInfoUrl = `${MAP_CONFIG.geoserverWMSUrl}?${params.toString()}`;
+        const response = await fetch(getFeatureInfoUrl);
+        
+        if (!response.ok) throw new Error('GetFeatureInfo request failed');
+        
+        const data = await response.json();
+        if (data.features?.length > 0) {
+          onFeatureClick({
+            location: { lat, lng },
+            data: data.features
+          });
+        }
+      } catch (error) {
+        console.error('GetFeatureInfo error:', error);
+      }
+    }
+  });
+
+  return null;
+};
 
 /********************************************************************************
  * MAIN MAP VIEWER COMPONENT
@@ -250,64 +294,58 @@ const MapViewer = () => {
   const [activeLegend, setActiveLegend] = useState(null);
   const [popupInfo, setPopupInfo] = useState(null);
   const [mapKey, setMapKey] = useState(0);
-  const [geoJsonData, setGeoJsonData] = useState(null);
+  const [showMonitoringStations, setShowMonitoringStations] = useState(false);
+  const [monitoringData, setMonitoringData] = useState(null);
+  const [selectedStation, setSelectedStation] = useState(null);
+  const [timeSeriesData, setTimeSeriesData] = useState([]);
+  const [showChart, setShowChart] = useState(false);
 
-  // Load GeoJSON data from the file
   useEffect(() => {
-    fetch('/assets/merged_data.geojson')
-      .then((response) => response.json())
-      .then((data) => setGeoJsonData(data))
-      .catch((error) => console.error('Error loading GeoJSON data:', error));
-  }, []);
+    if (showMonitoringStations) {
+      fetch('merged_data.geojson')
+        .then(response => response.json())
+        .then(data => {
+          data.features.forEach(feature => {
+            const coords = feature.geometry.coordinates;
+            feature.properties.latitude = coords[1];
+            feature.properties.longitude = coords[0];
+          });
+          setMonitoringData(data);
+        })
+        .catch(error => console.error('Error loading monitoring data:', error));
+    }
+  }, [showMonitoringStations]);
 
   const handleLayerSelection = useCallback((layer) => {
     const newSelectedLayers = new Set(selectedLayers);
 
-    // Toggle the selected layer
     if (newSelectedLayers.has(layer.layer)) {
       newSelectedLayers.delete(layer.layer);
     } else {
       newSelectedLayers.add(layer.layer);
     }
 
-    // If the selected layer is an Impact Layer (excluding SectorData), deselect all other layers
-    if (
-      IMPACT_LAYERS.some((impactLayer) => impactLayer.layer === layer.layer) &&
-      layer.layer !== IMPACT_LAYERS.find((l) => l.name === 'SectorData')?.layer
-    ) {
-      // Deselect all other layers except SectorData
+    if (IMPACT_LAYERS.some((impactLayer) => impactLayer.layer === layer.layer) &&
+        layer.layer !== IMPACT_LAYERS.find((l) => l.name === 'SectorData')?.layer) {
       HAZARD_LAYERS.forEach((hazardLayer) => {
-        if (newSelectedLayers.has(hazardLayer.layer)) {
-          newSelectedLayers.delete(hazardLayer.layer);
-        }
+        newSelectedLayers.delete(hazardLayer.layer);
       });
       BOUNDARY_LAYERS.forEach((boundaryLayer) => {
-        if (newSelectedLayers.has(boundaryLayer.layer)) {
-          newSelectedLayers.delete(boundaryLayer.layer);
-        }
+        newSelectedLayers.delete(boundaryLayer.layer);
       });
       IMPACT_LAYERS.forEach((impactLayer) => {
-        if (impactLayer.layer !== layer.layer && newSelectedLayers.has(impactLayer.layer)) {
+        if (impactLayer.layer !== layer.layer) {
           newSelectedLayers.delete(impactLayer.layer);
         }
       });
     }
 
-    // If the selected layer is Inundation Map, deselect all Impact Layers (excluding SectorData)
     if (HAZARD_LAYERS.some((hazardLayer) => hazardLayer.layer === layer.layer)) {
       IMPACT_LAYERS.forEach((impactLayer) => {
-        if (
-          impactLayer.layer !== IMPACT_LAYERS.find((l) => l.name === 'SectorData')?.layer &&
-          newSelectedLayers.has(impactLayer.layer)
-        ) {
+        if (impactLayer.layer !== IMPACT_LAYERS.find((l) => l.name === 'SectorData')?.layer) {
           newSelectedLayers.delete(impactLayer.layer);
         }
       });
-    }
-
-    // If the selected layer is SectorData, allow it to be selected with Boundary Layers or Inundation Map
-    if (layer.layer === IMPACT_LAYERS.find((l) => l.name === 'SectorData')?.layer) {
-      // No additional logic needed here
     }
 
     setSelectedLayers(newSelectedLayers);
@@ -320,22 +358,46 @@ const MapViewer = () => {
     setPopupInfo(info);
   }, []);
 
-  // Style for GeoJSON features
-  const geoJsonStyle = {
-    color: "#ff7800",
-    weight: 2,
-    opacity: 1,
-    fillOpacity: 0.7
+  const handleStationClick = (feature) => {
+    setSelectedStation(feature);
+    setShowChart(true);
+
+    if (feature?.properties) {
+      const { time_period, 'time_series_discharge_simulated-gfs': gfs, 'time_series_discharge_simulated-icon': icon } = feature.properties;
+      
+      try {
+        const times = time_period.split(',');
+        const gfsValues = gfs.split(',').map(Number);
+        const iconValues = icon.split(',').map(Number);
+        
+        const data = times.map((time, i) => ({
+          time: time.split(' ')[0],
+          gfs: gfsValues[i],
+          icon: iconValues[i]
+        }));
+        
+        setTimeSeriesData(data.filter((_, index) => index % 6 === 0));
+      } catch (error) {
+        console.error('Error parsing time series data:', error);
+      }
+    }
   };
 
-  // Function to handle click on GeoJSON features
-  const onEachFeature = (feature, layer) => {
-    if (feature.properties) {
-      const popupContent = Object.entries(feature.properties)
-        .map(([key, value]) => `<div><strong>${key}:</strong> ${value}</div>`)
-        .join('');
-      layer.bindPopup(popupContent);
-    }
+  const handleNonMonitoringClick = (feature, latlng) => {
+    if (!feature?.properties) return;
+    
+    const popup = L.popup()
+      .setLatLng(latlng)
+      .setContent(
+        `<div class="feature-popup">
+          ${Object.entries(feature.properties)
+            .filter(([key]) => !key.startsWith('_'))
+            .map(([key, value]) => `<div class="popup-row"><strong>${key}:</strong> ${value}</div>`)
+            .join('')}
+        </div>`
+      );
+    
+    popup.openOn(map);
   };
 
   return (
@@ -361,88 +423,126 @@ const MapViewer = () => {
           selectedLayers={selectedLayers}
           onLayerSelect={handleLayerSelection}
         />
+
+        <div className="layer-selector">
+          <h4>Additional Layers</h4>
+          <ListGroup className="mb-4">
+            <ListGroup.Item className="layer-item">
+              <Form.Check
+                type="checkbox"
+                id="monitoring-stations-toggle"
+                label="Monitoring Stations"
+                onChange={() => setShowMonitoringStations(prev => !prev)}
+                checked={showMonitoringStations}
+              />
+            </ListGroup.Item>
+          </ListGroup>
+        </div>
       </div>
 
-      <div className="map-container">
-        <MapContainer
-          center={MAP_CONFIG.initialPosition}
-          zoom={MAP_CONFIG.initialZoom}
-          scrollWheelZoom={true}
-          style={{ height: '100%', width: '100%' }}
-        >
-          <MapInteractionHandler
-            selectedLayers={selectedLayers}
-            onFeatureClick={handleFeatureClick}
-          />
+      <div className="main-content">
+        <div className="map-container">
+          <MapContainer
+            center={MAP_CONFIG.initialPosition}
+            zoom={MAP_CONFIG.initialZoom}
+            scrollWheelZoom={true}
+            style={{ height: '100%', width: '100%' }}
+          >
+            <MapInteractionHandler
+              selectedLayers={selectedLayers}
+              onFeatureClick={handleFeatureClick}
+            />
 
-          <LayersControl position="topright">
-            {BASE_MAPS.map((basemap) => (
-              <LayersControl.BaseLayer
-                key={basemap.name}
-                name={basemap.name}
-                checked={basemap.name === 'ICPAC'}
-              >
-                <TileLayer
-                  url={basemap.url}
-                  attribution={basemap.attribution}
-                />
-              </LayersControl.BaseLayer>
-            ))}
+            <LayersControl position="topright">
+              {BASE_MAPS.map((basemap) => (
+                <LayersControl.BaseLayer
+                  key={basemap.name}
+                  name={basemap.name}
+                  checked={basemap.name === 'ICPAC'}
+                >
+                  <TileLayer
+                    url={basemap.url}
+                    attribution={basemap.attribution}
+                  />
+                </LayersControl.BaseLayer>
+              ))}
 
-            {Array.from(selectedLayers).map((layer) => (
-              <LayersControl.Overlay
-                key={layer}
-                checked={true}
-                name={layer.split(':')[1] || 'Custom Layer'}
-              >
-                <WMSTileLayer
-                  key={`wms-${mapKey}`}
-                  url={MAP_CONFIG.geoserverWMSUrl}
-                  layers={layer}
-                  format="image/png"
-                  transparent={true}
-                  attribution="GeoServer"
-                  version="1.1.1"
-                />
-              </LayersControl.Overlay>
-            ))}
+              {Array.from(selectedLayers).map((layer) => (
+                <LayersControl.Overlay
+                  key={layer}
+                  checked={true}
+                  name={layer.split(':')[1] || 'Custom Layer'}
+                >
+                  <WMSTileLayer
+                    key={`wms-${mapKey}-${layer}`}
+                    url={MAP_CONFIG.geoserverWMSUrl}
+                    layers={layer}
+                    format="image/png"
+                    transparent={true}
+                    attribution="GeoServer"
+                    version="1.1.1"
+                    eventHandlers={{
+                      click: (e) => {
+                        if (!showMonitoringStations) {
+                          handleNonMonitoringClick(e.feature, e.latlng);
+                        }
+                      }
+                    }}
+                  />
+                </LayersControl.Overlay>
+              ))}
 
-            {/* Add GeoJSON Layer */}
-            {geoJsonData && (
-              <LayersControl.Overlay
-                key="geojson-layer"
-                checked={true}
-                name="Merged Data"
-              >
+              {showMonitoringStations && monitoringData && (
                 <GeoJSON
-                  data={geoJsonData}
-                  style={geoJsonStyle}
-                  onEachFeature={onEachFeature}
+                  data={monitoringData}
+                  pointToLayer={(feature, latlng) => 
+                    L.circleMarker(latlng, {
+                      ...MONITORING_STATIONS_CONFIG.style,
+                      fillColor: selectedStation?.properties?.SEC_NAME === feature.properties.SEC_NAME 
+                        ? MONITORING_STATIONS_CONFIG.style.selectedFillColor 
+                        : MONITORING_STATIONS_CONFIG.style.fillColor
+                    })
+                  }
+                  onEachFeature={(feature, layer) => {
+                    layer.on({
+                      click: () => handleStationClick(feature)
+                    });
+                  }}
                 />
-              </LayersControl.Overlay>
-            )}
-          </LayersControl>
+              )}
+            </LayersControl>
+          </MapContainer>
 
-          {popupInfo && (
-            <Popup
-              position={[popupInfo.location.lat, popupInfo.location.lng]}
-              onClose={() => setPopupInfo(null)}
-              offset={MAP_CONFIG.popupOffset}
-              maxWidth={MAP_CONFIG.popupWidth}
-              maxHeight={MAP_CONFIG.popupMaxHeight}
-            >
-              <FeatureInfoPopup info={popupInfo} />
-            </Popup>
+          {selectedStation && (
+            <StationInfo feature={selectedStation} />
           )}
-        </MapContainer>
 
-        {activeLegend && <Legend legendUrl={activeLegend} />}
+          {activeLegend && <MapLegend legendUrl={activeLegend} />}
+        </div>
+
+        {showChart && (
+          <div className="bottom-panel">
+            <div className="chart-header">
+              <h5>{selectedStation?.properties?.SEC_NAME || 'Discharge Chart'}</h5>
+              <button 
+                className="close-button"
+                onClick={() => {
+                  setShowChart(false);
+                  setSelectedStation(null);
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <DischargeChart timeSeriesData={timeSeriesData} />
+          </div>
+        )}
       </div>
 
       <style jsx global>{`
         .map-viewer {
           display: flex;
-          height: calc(100vh - 160px); /* Account for navbar (100px) and footer (60px) */
+          height: calc(100vh - 160px);
           width: 100%;
           position: relative;
           overflow: hidden;
@@ -458,63 +558,89 @@ const MapViewer = () => {
           z-index: 1000;
         }
 
+        .main-content {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+        }
+
         .map-container {
           flex: 1;
           position: relative;
           height: 100%;
         }
 
+        .bottom-panel {
+          height: 250px;
+          background: white;
+          border-top: 1px solid #ddd;
+          padding: 10px;
+          box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 10px;
+          padding: 0 10px;
+        }
+
+        .chart-container {
+          height: 200px;
+        }
+
+        .close-button {
+          background: none;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          padding: 0 8px;
+          color: #666;
+        }
+
+        .close-button:hover {
+          color: #333;
+        }
+
+        .station-info-overlay {
+          position: absolute;
+          top: 20px;
+          right: 20px;
+          background: white;
+          padding: 15px;
+          border-radius: 8px;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+          z-index: 1000;
+          max-width: 500px;
+        }
+
+        .station-details {
+          margin: 10px 0;
+        }
+
+        .alert, .alarm, .emergency {
+          padding: 5px;
+          margin: 3px 0;
+          border-radius: 4px;
+        }
+
+        .alert { background: #fff3cd; }
+        .alarm { background: #ffe5e5; }
+        .emergency { background: #ffcccc; }
+
         .map-legend {
           position: absolute;
-          bottom: 40px; /* Increased to avoid footer overlap */
+          bottom: 40px;
           left: 20px;
           background: white;
           padding: 10px;
           border-radius: 8px;
           box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
           z-index: 1000;
-          max-height: calc(100vh - 260px); /* Adjust for navbar, footer, and padding */
+          max-height: calc(100vh - 260px);
           overflow-y: auto;
-        }
-
-        .map-legend img {
-          max-width: 200px;
-          max-height: 300px;
-        }
-
-        .feature-popup {
-          min-width: 200px;
-          max-width: 300px;
-          padding: 12px;
-        }
-
-        .popup-title {
-          margin-bottom: 12px;
-          font-weight: bold;
-          border-bottom: 2px solid #eee;
-          padding-bottom: 8px;
-        }
-
-        .feature-details {
-          margin-bottom: 12px;
-        }
-
-        .property-row {
-          margin-bottom: 6px;
-          display: flex;
-          justify-content: space-between;
-          gap: 10px;
-          font-size: 0.9rem;
-        }
-
-        .property-label {
-          font-weight: 500;
-          color: #666;
-        }
-
-        .property-value {
-          text-align: right;
-          word-break: break-word;
         }
 
         .layer-selector h4 {
@@ -533,75 +659,32 @@ const MapViewer = () => {
           background-color: #f8f9fa;
         }
 
-        .leaflet-popup-content {
-          margin: 0;
-          min-width: 200px;
+        .feature-popup {
+          padding: 10px;
+          max-height: 300px;
+          overflow-y: auto;
         }
 
-        .leaflet-popup-content-wrapper {
-          padding: 0;
+        .popup-row {
+          margin-bottom: 5px;
+          font-size: 12px;
         }
 
-        .leaflet-container {
-          font-family: inherit;
-        }
-
-        .leaflet-bottom {
-          bottom: 40.leaflet-bottom {
-          bottom: 40px !important; /* Ensure controls don't overlap footer */
-        }
-
-        .leaflet-control-layers {
-          background: white;
-          padding: 6px;
-          border-radius: 4px;
-          box-shadow: 0 1px 5px rgba(0,0,0,0.2);
-        }
-
-        .leaflet-control-layers-list {
-          margin-bottom: 0;
-        }
-
-        .leaflet-control-layers-expanded {
-          padding: 8px 12px;
+        .discharge-chart {
+          padding: 10px;
           background: white;
           border-radius: 4px;
         }
 
-        .vector-layer-control {
-          border-bottom: 1px solid #dee2e6;
-          padding-bottom: 16px;
-        }
-
-        /* Form control styling */
-        .form-check {
-          padding-left: 1.75rem;
-        }
-
-        .form-check-input {
-          margin-top: 0.3rem;
-        }
-
-        .form-check-label {
-          margin-left: 0.5rem;
-          color: #333;
-        }
-
-        /* Responsive styles */
         @media (max-height: 768px) {
           .map-legend {
             max-height: calc(100vh - 300px);
-          }
-
-          .sidebar {
-            max-height: calc(100vh - 160px);
           }
         }
 
         @media (max-width: 768px) {
           .map-viewer {
             flex-direction: column;
-            height: calc(100vh - 160px);
           }
 
           .sidebar {
@@ -613,50 +696,11 @@ const MapViewer = () => {
             height: calc(100% - 200px);
           }
 
-          .map-legend {
-            bottom: 60px;
+          .station-info-overlay {
+            top: 10px;
+            right: 10px;
             left: 10px;
-            max-width: calc(100% - 20px);
-          }
-
-          .layer-selector h4 {
-            font-size: 1rem;
-          }
-
-          .layer-item {
-            padding: 6px 8px;
-          }
-
-          .property-row {
-            flex-direction: column;
-            gap: 4px;
-          }
-
-          .property-value {
-            text-align: left;
-          }
-        }
-
-        /* Print styles */
-        @media print {
-          .map-viewer {
-            height: 100%;
-          }
-
-          .sidebar {
-            display: none;
-          }
-
-          .map-container {
-            width: 100%;
-            height: 100%;
-          }
-
-          .map-legend {
-            position: relative;
-            bottom: auto;
-            left: auto;
-            page-break-inside: avoid;
+            max-width: none;
           }
         }
       `}</style>

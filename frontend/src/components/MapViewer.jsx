@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { MapContainer, TileLayer, WMSTileLayer, useMapEvents, useMap, LayersControl, GeoJSON, Popup } from 'react-leaflet';
-import { Form, ListGroup } from 'react-bootstrap';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts';
+import { MapContainer, TileLayer, WMSTileLayer, useMapEvents, LayersControl, GeoJSON, Popup } from 'react-leaflet';
+import { Form, ListGroup, Nav, Tab } from 'react-bootstrap';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend as RechartsLegend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import 'leaflet/dist/leaflet.css';
+import 'bootstrap/dist/css/bootstrap.min.css';
 import L from 'leaflet';
 
 /********************************************************************************
@@ -87,108 +88,14 @@ const BASE_MAPS = [
 ];
 
 /********************************************************************************
- * STATION INFO COMPONENT
- *******************************************************************************/
-const StationInfo = ({ feature }) => {
-  if (!feature?.properties) return null;
-  const props = feature.properties;
-
-  return (
-    <div className="station-info-overlay">
-      <h5>{props.SEC_NAME}</h5>
-      <div className="station-details">
-        <div><strong>Basin:</strong> {props.BASIN}</div>
-        <div><strong>Area:</strong> {`${props.AREA} km²`}</div>
-        <div><strong>Location:</strong> {`${props.latitude?.toFixed(4)}°N, ${props.longitude?.toFixed(4)}°E`}</div>
-      </div>
-      
-      <div className="threshold-info">
-        <div className="alert">
-          <strong>Alert:</strong> {props.Q_THR1} m³/s
-        </div>
-        <div className="alarm">
-          <strong>Alarm:</strong> {props.Q_THR2} m³/s
-        </div>
-        <div className="emergency">
-          <strong>Emergency:</strong> {props.Q_THR3} m³/s
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/********************************************************************************
- * DISCHARGE CHART COMPONENT
- *******************************************************************************/
-const DischargeChart = ({ timeSeriesData }) => {
-  if (!timeSeriesData || timeSeriesData.length === 0) return null;
-
-  return (
-    <div className="discharge-chart">
-      <ResponsiveContainer width="100%" height={200}>
-        <LineChart
-          data={timeSeriesData}
-          margin={{ top: 5, right: 20, left: 40, bottom: 35 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis
-            dataKey="time"
-            tick={{ fontSize: 10 }}
-            angle={-45}
-            textAnchor="end"
-            height={60}
-            interval={0}
-          />
-          <YAxis
-            label={{ 
-              value: 'Discharge (m³/s)',
-              angle: -90,
-              position: 'insideLeft',
-              style: { fontSize: 12 }
-            }}
-          />
-          <Tooltip 
-            formatter={(value) => [`${value.toFixed(2)} m³/s`]}
-            labelFormatter={(label) => `Date: ${label}`}
-          />
-          <RechartsLegend
-            verticalAlign="bottom"
-            height={36}
-            wrapperStyle={{
-              paddingTop: '10px',
-              paddingBottom: '10px',
-              borderTop: '1px solid #eee'
-            }}
-          />
-          <Line
-            type="monotone"
-            dataKey="gfs"
-            stroke="#4169E1"
-            name="GFS Forecast"
-            dot={false}
-          />
-          <Line
-            type="monotone"
-            dataKey="icon"
-            stroke="#32CD32"
-            name="ICON Forecast"
-            dot={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  );
-};
-
-/********************************************************************************
  * LAYER SELECTOR COMPONENT
  *******************************************************************************/
 const LayerSelector = ({ title, layers, selectedLayers, onLayerSelect }) => (
-  <div className="layer-selector">
+  <div>
     <h4>{title}</h4>
-    <ListGroup className="mb-4">
+    <ListGroup>
       {layers.map((layer) => (
-        <ListGroup.Item key={layer.name} className="layer-item">
+        <ListGroup.Item key={layer.name}>
           <Form.Check
             type="checkbox"
             name="layerSelection"
@@ -204,28 +111,127 @@ const LayerSelector = ({ title, layers, selectedLayers, onLayerSelect }) => (
 );
 
 /********************************************************************************
+ * STATION INFO COMPONENT
+ *******************************************************************************/
+const StationInfo = ({ feature }) => {
+  if (!feature?.properties) return null;
+  const props = feature.properties;
+
+  return (
+    <div>
+      <h5>{props.SEC_NAME}</h5>
+      <div>
+        <div><strong>Basin:</strong> {props.BASIN}</div>
+        <div><strong>Area:</strong> {`${props.AREA} km²`}</div>
+        <div><strong>Location:</strong> {`${props.latitude?.toFixed(4)}°N, ${props.longitude?.toFixed(4)}°E`}</div>
+      </div>
+      <div>
+        <div><strong>Alert:</strong> {props.Q_THR1} m³/s</div>
+        <div><strong>Alarm:</strong> {props.Q_THR2} m³/s</div>
+        <div><strong>Emergency:</strong> {props.Q_THR3} m³/s</div>
+      </div>
+    </div>
+  );
+};
+
+/********************************************************************************
+ * DISCHARGE CHART COMPONENT
+ *******************************************************************************/
+const DischargeChart = ({ timeSeriesData, feature }) => {
+  if (!timeSeriesData || timeSeriesData.length === 0) {
+    return <div className="chart-no-data">No data available for the selected station.</div>;
+  }
+
+  const alertThreshold = feature?.properties?.Q_THR1 || 0;
+  const alarmThreshold = feature?.properties?.Q_THR2 || 0;
+  const emergencyThreshold = feature?.properties?.Q_THR3 || 0;
+
+  return (
+    <div className="chart-container">
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart
+          data={timeSeriesData}
+          margin={{ top: 20, right: 30, left: 70, bottom: 60 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+          <XAxis
+            dataKey="time"
+            tick={{ fontSize: 10, fill: '#666' }}
+            angle={-45}
+            textAnchor="end"
+            height={60}
+            interval={0}
+          />
+          <YAxis
+            domain={[0, 'auto']}
+            tick={{ fontSize: 10, fill: '#666' }}
+            label={{ 
+              value: 'Discharge (m³/s)', 
+              angle: -90, 
+              position: 'insideLeft',
+              style: { textAnchor: 'middle', fill: '#666' },
+              offset: -55
+            }}
+          />
+          <Tooltip
+            contentStyle={{ backgroundColor: '#fff', border: '1px solid #ddd', borderRadius: '4px' }}
+            formatter={(value) => [`${value.toFixed(2)} m³/s`]}
+            labelFormatter={(label) => `Date: ${label}`}
+          />
+          <RechartsLegend
+            verticalAlign="top"
+            height={36}
+            wrapperStyle={{ paddingBottom: 10 }}
+          />
+          
+          {/* Reference lines removed */}
+
+          <Line
+            type="monotone"
+            dataKey="gfs"
+            stroke="#4169E1"
+            name="GFS Forecast"
+            strokeWidth={1.5}
+            dot={false}
+            activeDot={{ r: 6 }}
+          />
+          <Line
+            type="monotone"
+            dataKey="icon"
+            stroke="#32CD32"
+            name="ICON Forecast"
+            strokeWidth={1.5}
+            dot={false}
+            activeDot={{ r: 6 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+};
+
+/********************************************************************************
  * MAP LEGEND COMPONENT
  *******************************************************************************/
-const MapLegend = ({ legendUrl }) => (
-  <div className="map-legend">
-    <h5>Legend</h5>
+const MapLegend = ({ legendUrl, title }) => (
+  <div>
+    <h5>{title}</h5>
     <img src={legendUrl} alt="Legend" onError={(e) => e.target.style.display = 'none'} />
   </div>
 );
-
 /********************************************************************************
- * FEATURE POPUP COMPONENT
+ * LAYER POPUP COMPONENT
  *******************************************************************************/
-const FeaturePopup = ({ feature }) => {
+const LayerPopup = ({ feature, position }) => {
   if (!feature?.properties) return null;
 
   return (
-    <Popup>
-      <div className="feature-popup">
+    <Popup position={position}>
+      <div>
         {Object.entries(feature.properties)
           .filter(([key]) => !key.startsWith('_'))
           .map(([key, value]) => (
-            <div key={key} className="popup-row">
+            <div key={key}>
               <strong>{key}:</strong> {value}
             </div>
           ))}
@@ -237,7 +243,7 @@ const FeaturePopup = ({ feature }) => {
 /********************************************************************************
  * MAP INTERACTION HANDLER
  *******************************************************************************/
-const MapInteractionHandler = ({ selectedLayers, onFeatureClick }) => {
+const MapInteractionHandler = ({ selectedLayers, onFeatureInfo }) => {
   const map = useMapEvents({
     click: async (e) => {
       if (!selectedLayers.size) return;
@@ -267,14 +273,13 @@ const MapInteractionHandler = ({ selectedLayers, onFeatureClick }) => {
 
         const getFeatureInfoUrl = `${MAP_CONFIG.geoserverWMSUrl}?${params.toString()}`;
         const response = await fetch(getFeatureInfoUrl);
-        
         if (!response.ok) throw new Error('GetFeatureInfo request failed');
         
         const data = await response.json();
         if (data.features?.length > 0) {
-          onFeatureClick({
-            location: { lat, lng },
-            data: data.features
+          onFeatureInfo({
+            features: data.features,
+            latlng: { lat, lng }
           });
         }
       } catch (error) {
@@ -287,18 +292,127 @@ const MapInteractionHandler = ({ selectedLayers, onFeatureClick }) => {
 };
 
 /********************************************************************************
- * MAIN MAP VIEWER COMPONENT
+ * TABBED SIDEBAR COMPONENT
+ *******************************************************************************/
+const TabSidebar = ({ 
+  hazardLayers, 
+  impactLayers, 
+  boundaryLayers, 
+  selectedLayers, 
+  onLayerSelect,
+  showMonitoringStations,
+  setShowMonitoringStations,
+  selectedStation
+}) => {
+  return (
+    <div className="tabbed-sidebar">
+      <Tab.Container defaultActiveKey="monitoring">
+        <Nav variant="tabs" className="sidebar-tabs">
+          <Nav.Item>
+            <Nav.Link eventKey="monitoring" className="tab-link">Monitoring Data</Nav.Link>
+          </Nav.Item>
+          <Nav.Item>
+            <Nav.Link eventKey="forecast" className="tab-link">Forecast Data</Nav.Link>
+          </Nav.Item>
+        </Nav>
+
+        <Tab.Content>
+          <Tab.Pane eventKey="monitoring" className="tab-pane">
+            <LayerSelector 
+              title="Inundation Map" 
+              layers={hazardLayers} 
+              selectedLayers={selectedLayers} 
+              onLayerSelect={onLayerSelect} 
+            />
+            <LayerSelector 
+              title="Impact Layers" 
+              layers={impactLayers} 
+              selectedLayers={selectedLayers} 
+              onLayerSelect={onLayerSelect} 
+            />
+            <LayerSelector 
+              title="Boundary Layers" 
+              layers={boundaryLayers} 
+              selectedLayers={selectedLayers} 
+              onLayerSelect={onLayerSelect} 
+            />
+          </Tab.Pane>
+          <Tab.Pane eventKey="forecast" className="tab-pane">
+            <div className="forecast-content">
+              <h4>Forecast River Discharge</h4>
+              <ListGroup className="mb-4">
+                <ListGroup.Item>
+                  <Form.Check
+                    type="checkbox"
+                    id="monitoring-stations-toggle"
+                    label="Monitoring Stations"
+                    onChange={() => setShowMonitoringStations(prev => !prev)}
+                    checked={showMonitoringStations}
+                  />
+                </ListGroup.Item>
+              </ListGroup>
+
+              {selectedStation && (
+                <div className="station-characteristics">
+                  <h5>{selectedStation.properties?.SEC_NAME}</h5>
+                  <div className="characteristics-grid">
+                    <div className="characteristic-item">
+                      <span className="characteristic-label">Basin:</span>
+                      <span className="characteristic-value">{selectedStation.properties?.BASIN}</span>
+                    </div>
+                    <div className="characteristic-item">
+                      <span className="characteristic-label">Area:</span>
+                      <span className="characteristic-value">
+                        {selectedStation.properties?.AREA} km²
+                      </span>
+                    </div>
+                    <div className="characteristic-item">
+                      <span className="characteristic-label">Location:</span>
+                      <span className="characteristic-value">
+                        {selectedStation.properties?.latitude?.toFixed(4)}°N, {selectedStation.properties?.longitude?.toFixed(4)}°E
+                      </span>
+                    </div>
+                    <div className="characteristic-item">
+                      <span className="characteristic-label">Alert Threshold:</span>
+                      <span className="characteristic-value alert-threshold">
+                        {selectedStation.properties?.Q_THR1} m³/s
+                      </span>
+                    </div>
+                    <div className="characteristic-item">
+                      <span className="characteristic-label">Alarm Threshold:</span>
+                      <span className="characteristic-value alarm-threshold">
+                        {selectedStation.properties?.Q_THR2} m³/s
+                      </span>
+                    </div>
+                    <div className="characteristic-item">
+                      <span className="characteristic-label">Emergency Threshold:</span>
+                      <span className="characteristic-value emergency-threshold">
+                        {selectedStation.properties?.Q_THR3} m³/s
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Tab.Pane>
+        </Tab.Content>
+      </Tab.Container>
+    </div>
+  );
+};
+/********************************************************************************
+ * MAPVIEWER COMPONENT
  *******************************************************************************/
 const MapViewer = () => {
   const [selectedLayers, setSelectedLayers] = useState(new Set());
   const [activeLegend, setActiveLegend] = useState(null);
-  const [popupInfo, setPopupInfo] = useState(null);
   const [mapKey, setMapKey] = useState(0);
   const [showMonitoringStations, setShowMonitoringStations] = useState(false);
   const [monitoringData, setMonitoringData] = useState(null);
   const [selectedStation, setSelectedStation] = useState(null);
   const [timeSeriesData, setTimeSeriesData] = useState([]);
   const [showChart, setShowChart] = useState(false);
+  const [layerPopups, setLayerPopups] = useState([]);
 
   useEffect(() => {
     if (showMonitoringStations) {
@@ -317,48 +431,20 @@ const MapViewer = () => {
   }, [showMonitoringStations]);
 
   const handleLayerSelection = useCallback((layer) => {
-    const newSelectedLayers = new Set(selectedLayers);
-
+  setSelectedLayers(prev => {
+    const newSelectedLayers = new Set(prev);
     if (newSelectedLayers.has(layer.layer)) {
       newSelectedLayers.delete(layer.layer);
     } else {
       newSelectedLayers.add(layer.layer);
     }
+    return newSelectedLayers;
+  });
+  setActiveLegend(selectedLayers.has(layer.layer) ? null : layer.legend);
+  setMapKey(prev => prev + 1);
+}, [selectedLayers]);
 
-    if (IMPACT_LAYERS.some((impactLayer) => impactLayer.layer === layer.layer) &&
-        layer.layer !== IMPACT_LAYERS.find((l) => l.name === 'SectorData')?.layer) {
-      HAZARD_LAYERS.forEach((hazardLayer) => {
-        newSelectedLayers.delete(hazardLayer.layer);
-      });
-      BOUNDARY_LAYERS.forEach((boundaryLayer) => {
-        newSelectedLayers.delete(boundaryLayer.layer);
-      });
-      IMPACT_LAYERS.forEach((impactLayer) => {
-        if (impactLayer.layer !== layer.layer) {
-          newSelectedLayers.delete(impactLayer.layer);
-        }
-      });
-    }
-
-    if (HAZARD_LAYERS.some((hazardLayer) => hazardLayer.layer === layer.layer)) {
-      IMPACT_LAYERS.forEach((impactLayer) => {
-        if (impactLayer.layer !== IMPACT_LAYERS.find((l) => l.name === 'SectorData')?.layer) {
-          newSelectedLayers.delete(impactLayer.layer);
-        }
-      });
-    }
-
-    setSelectedLayers(newSelectedLayers);
-    setActiveLegend(newSelectedLayers.has(layer.layer) ? layer.legend : null);
-    setPopupInfo(null);
-    setMapKey(prev => prev + 1);
-  }, [selectedLayers]);
-
-  const handleFeatureClick = useCallback((info) => {
-    setPopupInfo(info);
-  }, []);
-
-  const handleStationClick = (feature) => {
+  const handleStationClick = useCallback((feature) => {
     setSelectedStation(feature);
     setShowChart(true);
 
@@ -381,63 +467,21 @@ const MapViewer = () => {
         console.error('Error parsing time series data:', error);
       }
     }
-  };
-
-  const handleNonMonitoringClick = (feature, latlng) => {
-    if (!feature?.properties) return;
-    
-    const popup = L.popup()
-      .setLatLng(latlng)
-      .setContent(
-        `<div class="feature-popup">
-          ${Object.entries(feature.properties)
-            .filter(([key]) => !key.startsWith('_'))
-            .map(([key, value]) => `<div class="popup-row"><strong>${key}:</strong> ${value}</div>`)
-            .join('')}
-        </div>`
-      );
-    
-    popup.openOn(map);
-  };
+  }, []);
 
   return (
     <div className="map-viewer">
       <div className="sidebar">
-        <LayerSelector
-          title="Inundation Map"
-          layers={HAZARD_LAYERS}
+        <TabSidebar
+          hazardLayers={HAZARD_LAYERS}
+          impactLayers={IMPACT_LAYERS}
+          boundaryLayers={BOUNDARY_LAYERS}
           selectedLayers={selectedLayers}
           onLayerSelect={handleLayerSelection}
+          showMonitoringStations={showMonitoringStations}
+          setShowMonitoringStations={setShowMonitoringStations}
+          selectedStation={selectedStation}
         />
-
-        <LayerSelector
-          title="Impact Layers"
-          layers={IMPACT_LAYERS}
-          selectedLayers={selectedLayers}
-          onLayerSelect={handleLayerSelection}
-        />
-
-        <LayerSelector
-          title="Boundary Layers"
-          layers={BOUNDARY_LAYERS}
-          selectedLayers={selectedLayers}
-          onLayerSelect={handleLayerSelection}
-        />
-
-        <div className="layer-selector">
-          <h4>Additional Layers</h4>
-          <ListGroup className="mb-4">
-            <ListGroup.Item className="layer-item">
-              <Form.Check
-                type="checkbox"
-                id="monitoring-stations-toggle"
-                label="Monitoring Stations"
-                onChange={() => setShowMonitoringStations(prev => !prev)}
-                checked={showMonitoringStations}
-              />
-            </ListGroup.Item>
-          </ListGroup>
-        </div>
       </div>
 
       <div className="main-content">
@@ -448,31 +492,15 @@ const MapViewer = () => {
             scrollWheelZoom={true}
             style={{ height: '100%', width: '100%' }}
           >
-            <MapInteractionHandler
-              selectedLayers={selectedLayers}
-              onFeatureClick={handleFeatureClick}
-            />
-
             <LayersControl position="topright">
               {BASE_MAPS.map((basemap) => (
-                <LayersControl.BaseLayer
-                  key={basemap.name}
-                  name={basemap.name}
-                  checked={basemap.name === 'ICPAC'}
-                >
-                  <TileLayer
-                    url={basemap.url}
-                    attribution={basemap.attribution}
-                  />
+                <LayersControl.BaseLayer key={basemap.name} name={basemap.name} checked={basemap.name === 'ICPAC'}>
+                  <TileLayer url={basemap.url} attribution={basemap.attribution} />
                 </LayersControl.BaseLayer>
               ))}
 
               {Array.from(selectedLayers).map((layer) => (
-                <LayersControl.Overlay
-                  key={layer}
-                  checked={true}
-                  name={layer.split(':')[1] || 'Custom Layer'}
-                >
+                <LayersControl.Overlay key={layer} checked={true} name={layer.split(':')[1] || 'Custom Layer'}>
                   <WMSTileLayer
                     key={`wms-${mapKey}-${layer}`}
                     url={MAP_CONFIG.geoserverWMSUrl}
@@ -481,13 +509,6 @@ const MapViewer = () => {
                     transparent={true}
                     attribution="GeoServer"
                     version="1.1.1"
-                    eventHandlers={{
-                      click: (e) => {
-                        if (!showMonitoringStations) {
-                          handleNonMonitoringClick(e.feature, e.latlng);
-                        }
-                      }
-                    }}
                   />
                 </LayersControl.Overlay>
               ))}
@@ -513,10 +534,6 @@ const MapViewer = () => {
             </LayersControl>
           </MapContainer>
 
-          {selectedStation && (
-            <StationInfo feature={selectedStation} />
-          )}
-
           {activeLegend && <MapLegend legendUrl={activeLegend} />}
         </div>
 
@@ -524,186 +541,12 @@ const MapViewer = () => {
           <div className="bottom-panel">
             <div className="chart-header">
               <h5>{selectedStation?.properties?.SEC_NAME || 'Discharge Chart'}</h5>
-              <button 
-                className="close-button"
-                onClick={() => {
-                  setShowChart(false);
-                  setSelectedStation(null);
-                }}
-              >
-                ×
-              </button>
+              <button className="close-button" onClick={() => { setShowChart(false); setSelectedStation(null); }}>×</button>
             </div>
-            <DischargeChart timeSeriesData={timeSeriesData} />
+            <DischargeChart timeSeriesData={timeSeriesData} feature={selectedStation} />
           </div>
         )}
       </div>
-
-      <style jsx global>{`
-        .map-viewer {
-          display: flex;
-          height: calc(100vh - 160px);
-          width: 100%;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .sidebar {
-          width: 300px;
-          padding: 20px;
-          background-color: #f8f9fa;
-          overflow-y: auto;
-          box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
-          height: 100%;
-          z-index: 1000;
-        }
-
-        .main-content {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          height: 100%;
-        }
-
-        .map-container {
-          flex: 1;
-          position: relative;
-          height: 100%;
-        }
-
-        .bottom-panel {
-          height: 250px;
-          background: white;
-          border-top: 1px solid #ddd;
-          padding: 10px;
-          box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
-        }
-
-        .chart-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 10px;
-          padding: 0 10px;
-        }
-
-        .chart-container {
-          height: 200px;
-        }
-
-        .close-button {
-          background: none;
-          border: none;
-          font-size: 24px;
-          cursor: pointer;
-          padding: 0 8px;
-          color: #666;
-        }
-
-        .close-button:hover {
-          color: #333;
-        }
-
-        .station-info-overlay {
-          position: absolute;
-          top: 20px;
-          right: 20px;
-          background: white;
-          padding: 15px;
-          border-radius: 8px;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-          z-index: 1000;
-          max-width: 500px;
-        }
-
-        .station-details {
-          margin: 10px 0;
-        }
-
-        .alert, .alarm, .emergency {
-          padding: 5px;
-          margin: 3px 0;
-          border-radius: 4px;
-        }
-
-        .alert { background: #fff3cd; }
-        .alarm { background: #ffe5e5; }
-        .emergency { background: #ffcccc; }
-
-        .map-legend {
-          position: absolute;
-          bottom: 40px;
-          left: 20px;
-          background: white;
-          padding: 10px;
-          border-radius: 8px;
-          box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-          z-index: 1000;
-          max-height: calc(100vh - 260px);
-          overflow-y: auto;
-        }
-
-        .layer-selector h4 {
-          margin-bottom: 12px;
-          color: #333;
-        }
-
-        .layer-item {
-          padding: 8px 12px;
-          border: 1px solid #dee2e6;
-          margin-bottom: 4px;
-          border-radius: 4px;
-        }
-
-        .layer-item:hover {
-          background-color: #f8f9fa;
-        }
-
-        .feature-popup {
-          padding: 10px;
-          max-height: 300px;
-          overflow-y: auto;
-        }
-
-        .popup-row {
-          margin-bottom: 5px;
-          font-size: 12px;
-        }
-
-        .discharge-chart {
-          padding: 10px;
-          background: white;
-          border-radius: 4px;
-        }
-
-        @media (max-height: 768px) {
-          .map-legend {
-            max-height: calc(100vh - 300px);
-          }
-        }
-
-        @media (max-width: 768px) {
-          .map-viewer {
-            flex-direction: column;
-          }
-
-          .sidebar {
-            width: 100%;
-            max-height: 200px;
-          }
-
-          .map-container {
-            height: calc(100% - 200px);
-          }
-
-          .station-info-overlay {
-            top: 10px;
-            right: 10px;
-            left: 10px;
-            max-width: none;
-          }
-        }
-      `}</style>
     </div>
   );
 };

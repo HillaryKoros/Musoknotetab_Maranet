@@ -21,15 +21,7 @@
   margin-right: 20px;
 }
 
-.brand-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
-  padding: 8px 12px;
-  border: 2px solid #FFC107;
-  border-radius: 4px;
-  background: rgba(0,0,0,0.2);
-}
+
 
 .flood-watch {
   display: flex;
@@ -62,7 +54,15 @@
   padding: 20px;
   padding-bottom: 60px;
 }
-
+.footer {
+  background-color: #333;
+  color: white;
+  text-align: center;
+  padding: 10px;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+}
 /* Footer */
 .footer-custom {
   background-color: #115803;
@@ -72,7 +72,231 @@
   font-size: 0.9rem;
 }
 
-/* Responsive Design */
+/* Map Viewer Styles */
+.map-viewer {
+  display: flex;
+  height: calc(100vh - 160px);
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 300px;
+  background-color: #f8f9fa;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.map-container {
+  flex: 1;
+  position: relative;
+  height: 100%;
+}
+
+/* Chart and Bottom Panel Styles */
+.bottom-panel {
+  height: 250px;
+  background: white;
+  border-top: 1px solid #ddd;
+  padding: 10px;
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 0 10px;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0 8px;
+  color: #666;
+}
+
+.close-button:hover {
+  color: #333;
+}
+
+.chart-container {
+  height: 100%;
+}
+
+/* Station Characteristics Styles */
+.station-characteristics {
+  padding: 15px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  margin-top: 20px;
+}
+
+.station-characteristics h5 {
+  margin-bottom: 15px;
+  color: #333;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.characteristics-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.characteristic-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.characteristic-label {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+.characteristic-value {
+  font-size: 14px;
+  color: #333;
+  font-weight: 600;
+}
+
+.alert-threshold { color: #FFD700; }
+.alarm-threshold { color: #FFA500; }
+.emergency-threshold { color: #FF0000; }
+
+/* Station Info and Map Legend */
+.station-info-overlay {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  z-index: 1000;
+  max-width: 500px;
+}
+
+.map-legend {
+  position: relative;
+  bottom: 70px;
+  left: 20px;
+  background: white;
+  /* padding: 10px; */
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  max-height: calc(100vh - 260px);
+  overflow-y: auto;
+}
+
+/* Tabbed Sidebar Styles */
+.tabbed-sidebar {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #f5f5f5;
+}
+
+.sidebar-tabs {
+  background-color: #228B22;
+  padding: 0;
+  margin: 0;
+  display: flex;
+}
+
+.tab-link {
+  color: #000000 !important;
+  background: none !important;
+  border: none !important;
+  padding: 15px 25px;
+  font-size: 14px;
+  transition: background-color 0.3s;
+  text-align: center;
+  width: 100%;
+}
+
+.tab-link.active {
+  background-color: #32CD32 !important;
+  color: #000000 !important;
+  font-weight: 500;
+}
+
+.tab-link:hover:not(.active) {
+  background-color: rgba(255, 255, 0, 0.2) !important;
+}
+
+.tab-pane {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+/* Filter Styles */
+.filters-section {
+  margin-bottom: 20px;
+}
+
+.filters-container {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.filters-container h6 {
+  color: #666;
+  font-size: 12px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.layers-section, .layer-selector {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.filter-select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  background-color: white;
+  color: #666;
+  cursor: pointer;
+  font-size: 14px;
+  margin-bottom: 15px;
+}
+
+.filter-select:hover {
+  border-color: #999;
+}
+
+/* Alert States */
+.alert { background: #fff3cd; }
+.alarm { background: #ffe5e5; }
+.emergency { background: #ffcccc; }
+
+/* Responsive Styles */
 @media (max-width: 991.98px) {
   .navbar-custom {
     height: auto;
@@ -99,5 +323,31 @@
 
   .brand-container {
     margin-right: 10px;
+  }
+  
+  .map-viewer {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    max-height: 200px;
+  }
+
+  .map-container {
+    height: calc(100% - 200px);
+  }
+
+  .station-info-overlay {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+}
+
+@media (max-height: 768px) {
+  .map-legend {
+    max-height: calc(100vh - 300px);
   }
 }

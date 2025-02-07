@@ -1,6 +1,9 @@
+// Import necessary dependencies
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
 import { Navbar, Container, Nav } from 'react-bootstrap';
+
+// Import component pages
 import Home from './components/Home';
 import MapViewer from './components/MapViewer';
 import Analysis from './components/Analysis';
@@ -8,15 +11,21 @@ import Indicators from './components/Indicators';
 import About from './components/About';
 import Partners from './components/Partners';
 import Contact from './components/Contact';
-import leftLogo from '@assets/ICPAC_Website_Header_Logo.svg';
 
+// Import assets and styles
+import leftLogo from '@assets/ICPAC_Website_Header_Logo.svg';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
+/**
+ * Main App component that handles routing and layout structure
+ * Includes a navigation bar, main content area, and footer
+ */
 const App = () => {
   return (
     <Router>
       <div className="app-wrapper">
+        {/* Navigation Bar */}
         <Navbar 
           className="navbar-custom" 
           expand="lg" 
@@ -27,56 +36,32 @@ const App = () => {
           }}
         >
           <Container fluid>
-            <div className="brand-container">
-              <div className="brand-text" style={{
-                padding: '8px 12px',
-                border: '2px solid #FFC107',
-                borderRadius: '4px',
-                display: 'inline-block',
-                background: 'rgba(0,0,0,0.2)'
-              }}>
-                <span style={{ 
-                  display: 'block',
-                  fontSize: '0.9rem',
-                  color: '#fff',
-                  letterSpacing: '1px',
-                  textTransform: 'uppercase',
-                  marginBottom: '4px'
-                }}>
-                  EAST AFRICA
-                </span>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <span style={{ 
-                    color: '#FFC107',
-                    fontWeight: 'bold',
-                    fontSize: '1.4rem',
-                    letterSpacing: '1.5px'
-                  }}>
-                    FLOOD
-                  </span>
-                  <span style={{ 
-                    color: '#fff',
-                    fontWeight: 'bold',
-                    fontSize: '1.4rem',
-                    letterSpacing: '1.5px'
-                  }}>
-                    WATCH
-                  </span>
-                </div>
+            {/* Brand Logo and Text Section */}
+            <Nav.Link 
+              as={NavLink} 
+              to="/map" 
+              className="brand-container" 
+              style={{ 
+                color: '#fff',
+                textDecoration: 'none'
+              }}
+            >
+              <div className="brand-text">
+                EAST AFRICA FLOOD WATCH
               </div>
-            </div>
+            </Nav.Link>
 
+            {/* Mobile Navigation Toggle Button */}
             <Navbar.Toggle aria-controls="basic-navbar-nav" />
             
+            {/* Navigation Links */}
             <Navbar.Collapse id="basic-navbar-nav">
-              <Nav className="mx-auto" style={{ gap: '1.5rem' }}>
+              <Nav className="mx-auto" style={{ gap: '2rem' }}> {/* Increased gap between nav items */}
+                {/* Home Link */}
                 <Nav.Link as={NavLink} to="/" className="nav-link" style={{ color: '#fff' }}>
                   HOME
                 </Nav.Link>
+                {/* MapViewer Link with special styling */}
                 <Nav.Link 
                   as={NavLink} 
                   to="/map" 
@@ -90,35 +75,42 @@ const App = () => {
                 >
                   MAPVIEWER
                 </Nav.Link>
+                {/* Analysis Link */}
                 <Nav.Link as={NavLink} to="/analysis" className="nav-link" style={{ color: '#fff' }}>
                   ANALYSIS
                 </Nav.Link>
+                {/* Indicators Link */}
                 <Nav.Link as={NavLink} to="/indicators" className="nav-link" style={{ color: '#fff' }}>
                   FLOOD INDICATORS
                 </Nav.Link>
+                {/* About Link */}
                 <Nav.Link as={NavLink} to="/about" className="nav-link" style={{ color: '#fff' }}>
                   ABOUT
                 </Nav.Link>
+                {/* Partners Link */}
                 <Nav.Link as={NavLink} to="/partners" className="nav-link" style={{ color: '#fff' }}>
                   PARTNERS
                 </Nav.Link>
+                {/* Contact Link */}
                 <Nav.Link as={NavLink} to="/contact" className="nav-link" style={{ color: '#fff' }}>
                   CONTACT US
                 </Nav.Link>
               </Nav>
             </Navbar.Collapse>
 
+            {/* ICPAC Logo */}
             <div className="d-flex align-items-center">
               <img
                 src={leftLogo}
                 alt="ICPAC Logo"
                 className="navbar-logo ms-3"
-                style={{ height: '100px' }}
+                style={{ height: '60px' }}
               />
             </div>
           </Container>
         </Navbar>
 
+        {/* Main Content Area */}
         <div className="main-content">
           <Routes>
             <Route path="/" element={<Home />} />
@@ -131,6 +123,7 @@ const App = () => {
           </Routes>
         </div>
 
+        {/* Footer Section */}
         <footer 
           className="footer-custom"
           style={{

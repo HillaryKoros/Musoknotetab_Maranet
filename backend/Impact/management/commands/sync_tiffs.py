@@ -30,8 +30,8 @@ class Command(BaseCommand):
         }
         
         # GeoServer configuration with URL switching
-        self.primary_geoserver_url = 'http://geoserver:8080/geoserver'
-        self.fallback_geoserver_url = 'http://127.0.0.1:8093/geoserver'
+        self.primary_geoserver_url = 'http://127.0.0.1:8093/geoserver'
+        self.fallback_geoserver_url = 'http://geoserver:8080/geoserver'
         self.geoserver_url = self.primary_geoserver_url  # Start with primary URL
         self.geoserver_username = config('GEOSERVER_USERNAME', default='admin')
         self.geoserver_password = config('GEOSERVER_PASSWORD', default='geoserver')

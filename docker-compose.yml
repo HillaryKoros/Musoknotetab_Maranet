@@ -7,10 +7,11 @@ services:
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/mediafiles
+      - ./shared_data:/app/data
     ports:
       - "8090:8000"
     environment:
-      - DB_HOST=postgis
+      - DB_HOST=flood_watch_postgis
       - DB_PORT=5432
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
@@ -116,10 +117,11 @@ services:
     volumes:
       - static_volume:/app/static
       - media_volume:/app/media
+      - ./shared_data:/usr/share/nginx/html/data
     environment:
       - NODE_ENV=production
-      - VITE_API_URL=http://127.0.0.1:8090  # Default to local if not set
-      - VITE_GEOSERVER_URL=http://127.0.0.1:8093  # Default to local if not set
+      - VITE_API_URL=http://127.0.0.1:8090
+      - VITE_GEOSERVER_URL=http://127.0.0.1:8093
     depends_on:
       web:
         condition: service_healthy

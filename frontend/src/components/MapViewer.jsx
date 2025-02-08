@@ -43,7 +43,7 @@ const createWMSLayer = (name, layerId, queryable = true) => ({
 });
 
 const HAZARD_LAYERS = [
-  createWMSLayer('Inundation Map', 'flood_hazard_20250204'),
+  createWMSLayer('Inundation Map', 'flood_hazard_20250208'),
   createWMSLayer('Alerts Map', 'Alerts')
 ];
 
@@ -416,7 +416,7 @@ const MapViewer = () => {
 
   useEffect(() => {
     if (showMonitoringStations) {
-      fetch('merged_data.geojson')
+      fetch('data/merged_data.geojson')
         .then(response => response.json())
         .then(data => {
           data.features.forEach(feature => {

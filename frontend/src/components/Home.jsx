@@ -5,7 +5,6 @@ import { Link } from 'react-router-dom';
 const Home = () => {
   const features = [
     { title: 'Interactive Map Viewer', description: 'Explore flood related data layers with interactive map interface', link: '/map', icon: '🗺️' },
-    { title: 'Data Reports', description: 'View reports and statistics for different layers', link: '/reports', icon: '📊' },
     { title: 'Advanced Analysis', description: 'Perform analysis of flood and demographic data', link: '/analysis', icon: '📈' },
   ];
 

@@ -88,8 +88,8 @@ services:
       - GEOSERVER_DATA_DIR=/opt/geoserver/data_dir
       - GEOSERVER_ADMIN_PASSWORD=${GEOSERVER_ADMIN_PASSWORD:-geoserver}
       - GEOSERVER_ADMIN_USER=${GEOSERVER_ADMIN_USER:-admin}
-      - INITIAL_MEMORY=1G
-      - MAXIMUM_MEMORY=2G
+      - INITIAL_MEMORY=2G
+      - MAXIMUM_MEMORY=4G
       - STABLE_EXTENSIONS=charts-plugin,control-flow-plugin
       - JAVA_OPTS=-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -XX:+UnlockExperimentalVMOptions -XX:+UseCompressedOops -XX:+OptimizeStringConcat
     volumes:
@@ -118,8 +118,8 @@ services:
       - media_volume:/app/media
     environment:
       - NODE_ENV=production
-      - VITE_API_URL=http://10.10.1.13:8090
-      - VITE_GEOSERVER_URL=http://10.10.1.13:8093
+      - VITE_API_URL=http://127.0.0.1:8090  # Default to local if not set
+      - VITE_GEOSERVER_URL=http://127.0.0.1:8093  # Default to local if not set
     depends_on:
       web:
         condition: service_healthy

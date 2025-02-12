@@ -15,20 +15,20 @@ ENV GDAL_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/libgdal.so \
     GDAL_DATA=/usr/share/gdal
 
 # Set the working directory
-WORKDIR /app
+WORKDIR /backend
 
 # Copy requirements first
-COPY requirements.txt /app/
+COPY requirements.txt /backend/
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
-COPY . /app/
+COPY . /backend/
 
 # Create directories and set permissions
-RUN mkdir -p /app/data && \
-    mkdir -p /app/staticfiles && \
-    mkdir -p /app/mediafiles && \
-    chmod -R 777 /app/data
+RUN mkdir -p /backend/data && \
+    mkdir -p /backend/staticfiles && \
+    mkdir -p /backend/mediafiles && \
+    chmod -R 777 /backend/data
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \

@@ -1,8 +1,8 @@
 from django.contrib import admin
 from leaflet.admin import LeafletGeoAdmin
-from .models import (
+from Impact.models import (
     AffectedGrazingLand, AffectedPopulation, ImpactedGDP, AffectedCrops,
-    AffectedLivestock, AffectedRoads, DisplacedPopulation,SectorData,SectorForecast,WaterBodies,RiverSection
+    AffectedLivestock, AffectedRoads, DisplacedPopulation,SectorData,SectorForecast,WaterBodies,RiverSection,GhaAdmin1
 )
 
 class BaseImpactAdmin(LeafletGeoAdmin):
@@ -61,3 +61,8 @@ class RiverSectionAdmin(BaseImpactAdmin):
     list_display = ['sec_name', 'basin', 'latitude', 'longitude']
     search_fields = ['sec_name', 'basin']
     list_filter = ['basin']
+
+@admin.register(GhaAdmin1)
+class GhaAdmin1Admin(BaseImpactAdmin):
+    list_display = ['adm0_name', 'geom']
+    search_fields = ['adm0_name']

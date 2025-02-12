@@ -1,7 +1,7 @@
 from rest_framework_gis.serializers import GeoFeatureModelSerializer 
 from rest_framework import viewsets,serializers
 
-from .models import AffectedPopulation, ImpactedGDP, AffectedCrops, AffectedRoads, DisplacedPopulation, AffectedLivestock, AffectedGrazingLand, SectorData,SectorForecast,WaterBodies
+from .models import AffectedPopulation, ImpactedGDP, AffectedCrops, AffectedRoads, DisplacedPopulation, AffectedLivestock, AffectedGrazingLand, SectorData,SectorForecast,WaterBodies,GhaAdmin1
 
 
 class AffectedPopulationSerializer(GeoFeatureModelSerializer):
@@ -69,5 +69,12 @@ class AffectedGrazingLandSerializer(GeoFeatureModelSerializer):
 class WaterBodiesSerializer(GeoFeatureModelSerializer):
     class Meta:
         model = WaterBodies
+        geo_field = 'geom'
+        fields = '__all__'
+
+
+class GhaAdmin1Serializer(GeoFeatureModelSerializer):
+    class Meta:
+        model = GhaAdmin1
         geo_field = 'geom'
         fields = '__all__'

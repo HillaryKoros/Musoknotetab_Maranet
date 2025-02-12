@@ -162,7 +162,7 @@ class SectorData(models.Model):
     cat = models.FloatField(null=True)
     # id = models.BigIntegerField(primary_key=True)
     geom = models.PointField()
-
+    
     def __unicode__(self):
         return self.sec_name
 
@@ -236,3 +236,24 @@ class RiverSection(models.Model):
     class Meta:
         verbose_name_plural = "RiverSections"
     
+
+
+# 11. Create a model named GhaAdmin1 that has the following fields:
+class GhaAdmin1(models.Model):
+    objectid = models.IntegerField()
+    g2008_0_field = models.FloatField()
+    g2008_0_id = models.FloatField()
+    adm0_code = models.FloatField()
+    adm0_name = models.CharField(max_length=100,null=True,blank=True)
+    continent = models.CharField(max_length=150,null=True,blank=True)
+    region = models.CharField(max_length=150,null=True,blank=True)  
+    shape_leng = models.FloatField()
+    shape_area = models.FloatField()
+    geom = models.MultiPolygonField(srid=4326) 
+
+    def __str__(self):
+        return self.adm0_name if self.adm0_name else "Unknown"
+    
+    class Meta:
+        verbose_name_plural = "GhaAdmin1"
+        db_table = 'Impact_ghaadmin1'

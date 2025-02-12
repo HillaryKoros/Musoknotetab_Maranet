@@ -30,7 +30,7 @@ class Command(BaseCommand):
         }
         
         # GeoServer configuration with URL switching
-        self.primary_geoserver_url = 'http://127.0.0.1:8093/geoserver'
+        self.primary_geoserver_url = 'http://10.10.1.13:8093/geoserver'
         self.fallback_geoserver_url = 'http://geoserver:8080/geoserver'
         self.geoserver_url = self.primary_geoserver_url  # Start with primary URL
         self.geoserver_username = config('GEOSERVER_USERNAME', default='admin')
@@ -209,8 +209,9 @@ class Command(BaseCommand):
             if not os.path.exists(local_path):
                 self.stdout.write(self.style.WARNING(f"Skipping {filename} - file not found"))
                 continue
-                
-            dated_store_name = f"{store_name}_{store_date}"
+            
+            # Only add date to store name if it's not an alert layer
+            dated_store_name = store_name if 'alert' in store_name else f"{store_name}_{store_date}"
             self.stdout.write(f"Publishing {filename} to GeoServer as {dated_store_name}...")
             
             try:

@@ -115,8 +115,8 @@ DATABASES = {
         'NAME': config('DB_NAME'),
         'USER': config('DB_USER'),
         'PASSWORD': config('DB_PASSWORD'),
-        'HOST': 'flood_watch_postgis',#config('DB_HOST', 'localhost'),#'db',
-        'PORT': config('DB_PORT','8091'),
+        'HOST': config('DB_HOST'),#'db''flood_watch_postgis',
+        'PORT': config('DB_PORT'),
     }
 }
 

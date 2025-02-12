@@ -17,10 +17,6 @@ import leftLogo from '@assets/ICPAC_Website_Header_Logo.svg';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
-/**
- * Main App component that handles routing and layout structure
- * Includes a navigation bar, main content area, and footer
- */
 const App = () => {
   return (
     <Router>
@@ -28,23 +24,14 @@ const App = () => {
         {/* Navigation Bar */}
         <Navbar 
           className="navbar-custom" 
-          expand="lg" 
-          style={{ 
-            backgroundColor: '#1B5E20',
-            padding: '0.5rem 1rem',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}
+          expand="lg"
         >
           <Container fluid>
             {/* Brand Logo and Text Section */}
             <Nav.Link 
               as={NavLink} 
               to="/map" 
-              className="brand-container" 
-              style={{ 
-                color: '#fff',
-                textDecoration: 'none'
-              }}
+              className="brand-container"
             >
               <div className="brand-text">
                 EAST AFRICA FLOOD WATCH
@@ -56,43 +43,30 @@ const App = () => {
             
             {/* Navigation Links */}
             <Navbar.Collapse id="basic-navbar-nav">
-              <Nav className="mx-auto" style={{ gap: '2rem' }}> {/* Increased gap between nav items */}
-                {/* Home Link */}
-                <Nav.Link as={NavLink} to="/" className="nav-link" style={{ color: '#fff' }}>
+              <Nav className="mx-auto">
+                <Nav.Link as={NavLink} to="/" className="nav-link">
                   HOME
                 </Nav.Link>
-                {/* MapViewer Link with special styling */}
                 <Nav.Link 
                   as={NavLink} 
                   to="/map" 
                   className="nav-link" 
-                  style={{ 
-                    color: '#FFC107',
-                    backgroundColor: '#2E7D32',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '4px'
-                  }}
                 >
                   MAPVIEWER
                 </Nav.Link>
-                {/* Analysis Link */}
-                <Nav.Link as={NavLink} to="/analysis" className="nav-link" style={{ color: '#fff' }}>
+                <Nav.Link as={NavLink} to="/analysis" className="nav-link">
                   ANALYSIS
                 </Nav.Link>
-                {/* Indicators Link */}
-                <Nav.Link as={NavLink} to="/indicators" className="nav-link" style={{ color: '#fff' }}>
+                <Nav.Link as={NavLink} to="/indicators" className="nav-link">
                   FLOOD INDICATORS
                 </Nav.Link>
-                {/* About Link */}
-                <Nav.Link as={NavLink} to="/about" className="nav-link" style={{ color: '#fff' }}>
-                  ABOUT
+                <Nav.Link as={NavLink} to="/about" className="nav-link">
+                  ABOUT  
                 </Nav.Link>
-                {/* Partners Link */}
-                <Nav.Link as={NavLink} to="/partners" className="nav-link" style={{ color: '#fff' }}>
+                <Nav.Link as={NavLink} to="/partners" className="nav-link">
                   PARTNERS
                 </Nav.Link>
-                {/* Contact Link */}
-                <Nav.Link as={NavLink} to="/contact" className="nav-link" style={{ color: '#fff' }}>
+                <Nav.Link as={NavLink} to="/contact" className="nav-link">
                   CONTACT US
                 </Nav.Link>
               </Nav>
@@ -104,7 +78,6 @@ const App = () => {
                 src={leftLogo}
                 alt="ICPAC Logo"
                 className="navbar-logo ms-3"
-                style={{ height: '60px' }}
               />
             </div>
           </Container>
@@ -124,20 +97,8 @@ const App = () => {
         </div>
 
         {/* Footer Section */}
-        <footer 
-          className="footer-custom"
-          style={{
-            backgroundColor: '#1B5E20',
-            color: '#fff',
-            padding: '1rem',
-            textAlign: 'center',
-            position: 'fixed',
-            bottom: 0,
-            width: '100%',
-            zIndex: 1000
-          }}
-        >
-          © 2025 East Africa Flood Watch | IGAD-ICPAC
+        <footer className="footer">
+          <div>© 2025 East Africa Flood Watch | IGAD-ICPAC</div>
         </footer>
       </div>
     </Router>

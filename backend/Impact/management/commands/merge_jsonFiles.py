@@ -13,7 +13,6 @@ class Command(BaseCommand):
     def get_data_path(self, base_date=None):
         if base_date is None:
             base_date = datetime.now()
-
         year = str(base_date.year)
         month = str(base_date.month).zfill(2)
         day = str(base_date.day).zfill(2)
@@ -25,90 +24,65 @@ class Command(BaseCommand):
         
         return base_path, full_path, base_date
 
-    def handle(self, *args, **options):
-        try:
-            # Get the shared data directory path
-            data_dir = self.get_data_dir()
-            output_file = os.path.join(data_dir, 'merged_data.geojson')
-            
-            with tempfile.TemporaryDirectory() as temp_dir:
-                json_dir = os.path.join(temp_dir, 'json_files')
-                shapefile_dir = os.path.join(temp_dir, 'shapefiles')
-                os.makedirs(json_dir)
-                os.makedirs(shapefile_dir)
-                
-                json_files, shapefile_dir = self.sync_data(json_dir, shapefile_dir)
-                self.process_and_merge_data(json_files, shapefile_dir, output_file)
-
-        except Exception as e:
-            self.stderr.write(self.style.ERROR(f"Error: {e}"))
-            raise
-
-    def get_data_dir(self):
-        """Get the correct path to shared data directory."""
-        data_dir = '/app/data'
+    def get_frontend_public_dir(self):
+        """Get the correct path to frontend/public directory."""
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+        project_root = os.path.dirname(backend_dir)
+        frontend_public = os.path.join(project_root, 'frontend', 'public')
         
-        try:
-            os.makedirs(data_dir, exist_ok=True)
-            self.stdout.write(self.style.SUCCESS(f"Data directory available at {data_dir}"))
-        except Exception as e:
-            raise Exception(f"Failed to access or create data directory at {data_dir}: {e}")
+        if not os.path.exists(frontend_public):
+            raise Exception(f"Frontend public directory not found at {frontend_public}")
             
-        return data_dir
+        return frontend_public
 
-    def check_path_exists(self, sftp, path):
-        """Check if a path exists in the SFTP server."""
+    def check_remote_path_exists(self, sftp, path):
+        """Check if a remote path exists on the SFTP server."""
         try:
             sftp.stat(path)
             return True
         except IOError:
             return False
 
-    def sync_data(self, json_dir, shapefile_dir):
-        """Download JSON and shapefile data from remote SFTP server with date fallback."""
-        sftp = self.connect_sftp()
+    def get_valid_json_path(self, sftp, max_retries=7):
+        """
+        Get the most recent valid JSON path, falling back to previous days if needed.
+        Returns tuple of (path, date) or (None, None) if no valid path found.
+        """
+        current_date = datetime.now()
+        
+        for i in range(max_retries):
+            try_date = current_date - timedelta(days=i)
+            _, full_path, _ = self.get_data_path(try_date)
+            
+            if self.check_remote_path_exists(sftp, full_path):
+                return full_path, try_date
+                
+        return None, None
 
+    def handle(self, *args, **kwargs):
         try:
-            current_date = datetime.now()
-            base_path, full_path, used_date = self.get_data_path(current_date)
+            # Get the correct frontend/public directory path
+            frontend_public_dir = self.get_frontend_public_dir()
+            output_file = os.path.join(frontend_public_dir, 'merged_data.geojson')
             
-            self.stdout.write(f"Trying path: {base_path}")
-            
-            if not self.check_path_exists(sftp, base_path):
-                self.stdout.write(self.style.WARNING(
-                    f"Data not found for current date {current_date.date()}, trying yesterday..."
-                ))
-                yesterday = current_date - timedelta(days=1)
-                base_path, full_path, used_date = self.get_data_path(yesterday)
+            # Create temporary directory for processing
+            with tempfile.TemporaryDirectory() as temp_dir:
+                # Create subdirectories in temp
+                json_dir = os.path.join(temp_dir, 'json_files')
+                shapefile_dir = os.path.join(temp_dir, 'shapefiles')
+                os.makedirs(json_dir)
+                os.makedirs(shapefile_dir)
                 
-                self.stdout.write(f"Trying yesterday's path: {base_path}")
+                # Sync data from SFTP server to temp directory
+                json_files, shapefile_dir = self.sync_data(json_dir, shapefile_dir)
                 
-                if not self.check_path_exists(sftp, base_path):
-                    raise Exception(
-                        f"Data not found for either {current_date.date()} or {yesterday.date()}"
-                    )
+                # Process and merge data, saving directly to frontend/public
+                self.process_and_merge_data(json_files, shapefile_dir, output_file)
 
-            if not self.check_path_exists(sftp, full_path):
-                raise Exception(
-                    f"Directory '00' not found in {base_path}"
-                )
-                
-            self.stdout.write(self.style.SUCCESS(
-                f"Using data from: {used_date.date()}"
-            ))
-
-            self.stdout.write("Downloading JSON files...")
-            json_files = self.download_files(sftp, full_path, json_dir, '.json')
-
-            self.stdout.write("Downloading shapefiles...")
-            shapefile_remote_dir = config('SHAPEFILE_REMOTE_DIR')
-            shapefile_extensions = ['.shp', '.shx', '.dbf', '.prj']
-            self.download_files(sftp, shapefile_remote_dir, shapefile_dir, extensions=shapefile_extensions)
-
-            return json_files, shapefile_dir
-
-        finally:
-            sftp.close()
+        except Exception as e:
+            self.stderr.write(self.style.ERROR(f"Error: {e}"))
+            raise
 
     def connect_sftp(self):
         """Establish an SFTP connection."""
@@ -124,13 +98,43 @@ class Command(BaseCommand):
         except Exception as e:
             raise Exception(f"Failed to connect to SFTP server: {e}")
 
+    def sync_data(self, json_dir, shapefile_dir):
+        """Download JSON and shapefile data from remote SFTP server."""
+        sftp = self.connect_sftp()
+
+        try:
+            # Get valid JSON path with fallback
+            json_path, data_date = self.get_valid_json_path(sftp)
+            if not json_path:
+                raise Exception("No valid JSON data found for the last 7 days")
+
+            self.stdout.write(f"Using JSON data from: {data_date.strftime('%Y-%m-%d')}")
+
+            # Get static shapefile directory
+            shapefile_remote_dir = config('SHAPEFILE_REMOTE_DIR')
+            if not self.check_remote_path_exists(sftp, shapefile_remote_dir):
+                raise Exception(f"Shapefile directory not found: {shapefile_remote_dir}")
+
+            # Download JSON files
+            self.stdout.write("Downloading JSON files...")
+            json_files = self.download_files(sftp, json_path, json_dir, '.json')
+
+            # Download shapefiles
+            self.stdout.write("Downloading shapefiles...")
+            shapefile_extensions = ['.shp', '.shx', '.dbf', '.prj']
+            self.download_files(sftp, shapefile_remote_dir, shapefile_dir, extensions=shapefile_extensions)
+
+            return json_files, shapefile_dir
+
+        finally:
+            sftp.close()
+
     def download_files(self, sftp, remote_dir, local_dir, extensions):
         """Download files with specified extensions from a remote directory."""
         try:
             remote_files = sftp.listdir(remote_dir)
         except IOError as e:
-            self.stderr.write(self.style.ERROR(f"Error accessing directory {remote_dir}: {e}"))
-            return []
+            raise Exception(f"Error accessing remote directory {remote_dir}: {e}")
 
         downloaded_files = []
 
@@ -150,6 +154,11 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.SUCCESS(f"Downloaded {file}"))
                 except FileNotFoundError:
                     self.stderr.write(self.style.WARNING(f"File not found: {remote_path}"))
+                except Exception as e:
+                    self.stderr.write(self.style.WARNING(f"Error downloading {file}: {e}"))
+
+        if not downloaded_files:
+            raise Exception(f"No files with extensions {extensions} found in {remote_dir}")
 
         return downloaded_files
 
@@ -217,8 +226,8 @@ class Command(BaseCommand):
                 final_gdf = gpd.GeoDataFrame(merged_data, geometry='geometry')
                 final_gdf.set_crs(epsg=4326, inplace=True)
                 
-                # Create parent directory if it doesn't exist
-                os.makedirs(os.path.dirname(output_file), exist_ok=True)
+                # Add metadata about the data date
+                final_gdf.attrs['data_date'] = datetime.now().strftime('%Y-%m-%d')
                 
                 # If file exists, remove it before saving new data
                 if os.path.exists(output_file):

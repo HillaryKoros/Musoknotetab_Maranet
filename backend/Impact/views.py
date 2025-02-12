@@ -6,11 +6,11 @@ from rest_framework.response import Response
 from .serializers import (
     AffectedPopulationSerializer, ImpactedGDPSerializer, AffectedCropsSerializer,
     AffectedRoadsSerializer, DisplacedPopulationSerializer, AffectedLivestockSerializer,
-    AffectedGrazingLandSerializer, SectorDataSerializer,SectorForecastSerializer,WaterBodiesSerializer
+    AffectedGrazingLandSerializer, SectorDataSerializer,SectorForecastSerializer,WaterBodiesSerializer,GhaAdmin1Serializer
 )
 from Impact.models import (
     AffectedPopulation, ImpactedGDP, AffectedCrops, AffectedGrazingLand,
-    AffectedLivestock, AffectedRoads, DisplacedPopulation, SectorData,SectorForecast,WaterBodies
+    AffectedLivestock, AffectedRoads, DisplacedPopulation, SectorData,SectorForecast,WaterBodies,GhaAdmin1
 )
 
 @extend_schema(tags=['affected-population'])
@@ -74,3 +74,10 @@ class WaterbodiesViewSet(viewsets.ReadOnlyModelViewSet):
     schema = AutoSchema()
     queryset = WaterBodies.objects.all()
     serializer_class = WaterBodiesSerializer
+
+
+@extend_schema(tags=['gha-admin1'])
+class GhaAdmin1ViewSet(viewsets.ReadOnlyModelViewSet):
+    schema = AutoSchema()
+    queryset = GhaAdmin1.objects.all()
+    serializer_class = GhaAdmin1Serializer

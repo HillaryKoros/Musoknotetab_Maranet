@@ -257,3 +257,31 @@ class GhaAdmin1(models.Model):
     class Meta:
         verbose_name_plural = "GhaAdmin1"
         db_table = 'Impact_ghaadmin1'
+
+
+class Admin1(models.Model):
+    objectid = models.BigIntegerField()
+    country = models.CharField(max_length=254)
+    area = models.FloatField()
+    shape_leng = models.FloatField()
+    shape_area = models.FloatField()
+    land_under = models.CharField(max_length=254,null=True,blank=True)
+    geom = models.MultiPolygonField(srid=4326)
+
+    def __str__(self):
+        return self.country  # Adjust as needed
+
+class WaterBodies(models.Model):
+    af_wtr_id = models.BigIntegerField()
+    sqkm = models.FloatField()
+    name_of_wa = models.CharField(max_length=254, blank=True, null=True)
+    type_of_wa = models.CharField(max_length=254, blank=True, null=True)
+    shape_area = models.FloatField()
+    shape_len = models.FloatField()
+    geom = models.MultiPolygonField(srid=4326)
+
+    def __unicode__(self):
+        return self.name_of_wa or "Unnamed Water Body"
+
+    class Meta:
+        verbose_name_plural = "WaterBodies"

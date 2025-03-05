@@ -14,6 +14,7 @@ import Contact from './components/Contact';
 
 // Import assets and styles
 import leftLogo from '@assets/ICPAC_Website_Header_Logo.svg';
+import floodWatchLogo from '@assets/flood-watch-banner-transparent.png'; // Import the PNG logo
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
@@ -27,16 +28,14 @@ const App = () => {
           expand="lg"
         >
           <Container fluid>
-            {/* Brand Logo and Text Section */}
-            <Nav.Link 
-              as={NavLink} 
-              to="/map" 
-              className="brand-container"
-            >
-              <div className="brand-text">
-                EAST AFRICA FLOOD WATCH
-              </div>
-            </Nav.Link>
+            {/* Brand Logo Section (not a link) */}
+            <div className="brand-container">
+              <img
+                src={floodWatchLogo}
+                alt="East Africa Flood Watch"
+                className="brand-logo"
+              />
+            </div>
 
             {/* Mobile Navigation Toggle Button */}
             <Navbar.Toggle aria-controls="basic-navbar-nav" />
@@ -50,7 +49,7 @@ const App = () => {
                 <Nav.Link 
                   as={NavLink} 
                   to="/map" 
-                  className="nav-link" 
+                  className="nav-link fw-bold" 
                 >
                   MAPVIEWER
                 </Nav.Link>

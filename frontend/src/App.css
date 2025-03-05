@@ -33,6 +33,7 @@
   gap: 8px;
 }
 
+/* Standard nav link styles */
 .nav-link {
   font-size: 0.9rem !important;
   padding: 8px 12px !important;
@@ -49,6 +50,18 @@
   color: #FFC107 !important;
   background-color: #2E7D32;
   border-radius: 4px;
+}
+
+/* MAPVIEWER specific styles */
+.nav-link.fw-bold {
+  font-weight: 700 !important;
+}
+
+/* Ensure navbar links are properly aligned */
+.navbar-custom .navbar-nav {
+  display: flex;
+  align-items: center;
+  margin-left: 350px; /* Aligns with where the sidebar ends */
 }
 
 /* Footer */
@@ -391,6 +404,10 @@ input:checked + .toggle-slider-small:before {
   .nav-link {
     padding: 6px 10px !important;
   }
+  
+  .navbar-custom .navbar-nav {
+    margin-left: 0; /* Reset margin for smaller screens */
+  }
 }
 
 @media (max-width: 768px) {
@@ -422,6 +439,7 @@ input:checked + .toggle-slider-small:before {
 
   .navbar-custom .navbar-nav {
     gap: 0.5rem !important;
+    margin-left: 0;
   }
 
   .brand-container {
@@ -429,7 +447,25 @@ input:checked + .toggle-slider-small:before {
   }
 }
 
+.feature-info {
+  padding: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+}
 
+.popup-row {
+  margin: 5px 0;
+  font-size: 12px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 3px;
+}
 
+.popup-row:last-child {
+  border-bottom: none;
+}
 
-
+.brand-logo {
+  height: auto;
+  max-height: 50px; /* Adjust based on your design needs */
+  width: auto;
+}

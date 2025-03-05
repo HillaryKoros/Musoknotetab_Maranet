@@ -35,6 +35,9 @@ INSTALLED_APPS = [
     'leaflet',
     # Local apps
     'Impact',
+    #celery
+    # 'django_celery_beat',
+    # 'django_celery_results',
 ]
 
 # Middleware configuration
@@ -159,6 +162,18 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ],
 }
+
+
+# # Celery Settings
+# CELERY_BROKER_URL = 'redis://redis:6379/0'  # Using Redis as broker
+# CELERY_RESULT_BACKEND = 'django-db'  # Store results in Django database
+# CELERY_ACCEPT_CONTENT = ['json']
+# CELERY_TASK_SERIALIZER = 'json'
+# CELERY_RESULT_SERIALIZER = 'json'
+# CELERY_TIMEZONE = TIME_ZONE  # Use your project's time zone
+
+# # Celery Beat settings
+# CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
 # DRF Spectacular settings
 SPECTACULAR_SETTINGS = {

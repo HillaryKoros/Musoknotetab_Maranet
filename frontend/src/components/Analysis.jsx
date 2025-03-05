@@ -1,239 +1,137 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Form, Button, Spinner, Tabs, Tab, Table } from 'react-bootstrap';
+import { Container, Row, Col, Card, Form, Button, Spinner, Table, Alert } from 'react-bootstrap';
 import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  BarChart, Bar, ComposedChart, PieChart, Pie, Cell
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell
 } from 'recharts';
 import { FileText, FileSpreadsheet } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import leftLogo from '@assets/ICPAC_Website_Header_Logo.svg';
-
 
 const Analysis = () => {
-  // State Management
   const [loading, setLoading] = useState(true);
-  const [stationData, setStationData] = useState([]);
-  const [selectedStation, setSelectedStation] = useState('');
-  const [timeSeriesData, setTimeSeriesData] = useState([]);
-  const [currentStationInfo, setCurrentStationInfo] = useState(null);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [analysisMetrics, setAnalysisMetrics] = useState(null);
-  const [selectedBasin, setSelectedBasin] = useState('');
-  const [selectedAdmin, setSelectedAdmin] = useState('');
-  const [availableBasins, setAvailableBasins] = useState([]);
-  const [availableAdmins, setAvailableAdmins] = useState([]);
-  const [availableStations, setAvailableStations] = useState([]);
-  const [regionalDischarge, setRegionalDischarge] = useState([]);
-  const [impactData, setImpactData] = useState({
-    population: null,
-    gdp: null,
-    crops: null,
-    roads: null,
-    livestock: null,
-    grazingLand: null
-  });
+  const [geoData, setGeoData] = useState({});
+  const [selectedCountry, setSelectedCountry] = useState('');
+  const [selectedRegion, setSelectedRegion] = useState('');
+  const [selectedLayer, setSelectedLayer] = useState('');
+  const [availableCountries, setAvailableCountries] = useState([]);
+  const [availableRegions, setAvailableRegions] = useState([]);
+  const [impactData, setImpactData] = useState(null);
+  const [error, setError] = useState(null);
+
+  const LAYERS = {
+    affectedPop: { endpoint: `/api/affectedPop/`, label: 'Population' },
+    affectedGDP: { endpoint: `/api/affectedGDP/`, label: 'GDP' },
+    affectedCrops: { endpoint: `/api/affectedCrops/`, label: 'Crops' },
+    affectedRoads: { endpoint: `/api/affectedRoads/`, label: 'Roads' },
+    displacedPop: { endpoint: `/api/displacedPop/`, label: 'Displaced Population' },
+    affectedLivestock: { endpoint: `/api/affectedLivestock/`, label: 'Livestock' },
+    affectedGrazingLand: { endpoint: `/api/affectedGrazingLand/`, label: 'Grazing Land' }
+  };
 
   // Initial data load
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch('merged_data.geojson');
-        const data = await response.json();
-        
-        const processedData = data.features.map(feature => ({
-          ...feature,
-          properties: {
-            ...feature.properties,
-            latitude: feature.geometry.coordinates[1],
-            longitude: feature.geometry.coordinates[0]
-          }
-        }));
+    const fetchInitialData = async () => {
+      setLoading(true);
+      setError(null);
+      const initialLayer = 'affectedPop';
 
-        setStationData(processedData);
-        
-        // Get unique admin areas
-        const admins = [...new Set(processedData.map(station => 
-          station.properties.ADMIN_B_L1
-        ))].filter(Boolean).sort();
-        
-        setAvailableAdmins(admins);
-        setLoading(false);
+      try {
+        console.log(`Fetching initial data from: ${LAYERS[initialLayer].endpoint}`);
+        const response = await fetch(LAYERS[initialLayer].endpoint);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+
+        const data = await response.json();
+        console.log('Initial API response:', data);
+
+        if (!data.features || !Array.isArray(data.features)) {
+          throw new Error('Invalid JSON format: Expected a FeatureCollection with features array');
+        }
+
+        setGeoData({ [initialLayer]: data.features });
+        const countries = [...new Set(data.features.map(f => f.properties?.name_0).filter(Boolean))].sort();
+        console.log('Available countries:', countries);
+        setAvailableCountries(countries);
+
+        if (countries.length === 0) setError('No countries found in the API response');
       } catch (error) {
-        console.error('Error loading station data:', error);
+        console.error('Error fetching initial data:', error);
+        setError(`Failed to load initial data: ${error.message}`);
+      } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    fetchInitialData();
   }, []);
 
-  // Update available basins when admin changes
+  // Fetch layer data and update regions
   useEffect(() => {
-    if (!selectedAdmin) {
-      setAvailableBasins([]);
-      setSelectedBasin('');
+    if (!selectedLayer) {
+      setAvailableRegions([]);
+      setSelectedRegion('');
+      setImpactData(null);
       return;
     }
 
-    // Filter stations by selected admin
-    const adminStations = stationData.filter(station => 
-      station.properties.ADMIN_B_L1 === selectedAdmin
-    );
-
-    // Get unique basins within the selected admin area
-    const basins = [...new Set(adminStations.map(station => 
-      station.properties.BASIN
-    ))].filter(Boolean).sort();
-
-    setAvailableBasins(basins);
-    setSelectedBasin('');
-    
-    // Reset station-specific selections
-    setSelectedStation('');
-    setTimeSeriesData([]);
-    setAnalysisMetrics(null);
-  }, [selectedAdmin, stationData]);
-
-  // Update available stations when basin changes
-  useEffect(() => {
-    if (!selectedAdmin || !selectedBasin) {
-      setAvailableStations([]);
-      setSelectedStation('');
-      return;
-    }
-
-    // Filter stations by both admin and basin
-    const filteredStations = stationData.filter(station => 
-      station.properties.ADMIN_B_L1 === selectedAdmin &&
-      station.properties.BASIN === selectedBasin
-    );
-
-    setAvailableStations(filteredStations);
-    
-    // Process regional discharge data
-    const regionalData = filteredStations.map(station => ({
-      name: station.properties.SEC_NAME,
-      data: processTimeSeriesData(station),
-      threshold: station.properties.Q_THR1,
-      location: {
-        lat: station.properties.latitude,
-        lon: station.properties.longitude
-      }
-    }));
-
-    setRegionalDischarge(regionalData);
-    
-    // Reset station-specific selections
-    setSelectedStation('');
-    setTimeSeriesData([]);
-    setAnalysisMetrics(null);
-  }, [selectedAdmin, selectedBasin, stationData]);
-
-  // Fetch impact data when admin area changes
-  useEffect(() => {
-    if (!selectedAdmin) return;
-
-    const fetchImpactData = async () => {
+    const fetchLayerData = async () => {
+      setError(null);
       try {
-        const baseUrl = 'http://10.10.1.13:8090/api';
-        const endpoints = {
-          population: `${baseUrl}/affectedPop/admin/${selectedAdmin}`,
-          gdp: `${baseUrl}/affectedGDP/admin/${selectedAdmin}`,
-          crops: `${baseUrl}/affectedCrops/admin/${selectedAdmin}`,
-          roads: `${baseUrl}/affectedRoads/admin/${selectedAdmin}`,
-          livestock: `${baseUrl}/affectedLivestock/admin/${selectedAdmin}`,
-          grazingLand: `${baseUrl}/affectedGrazingLand/admin/${selectedAdmin}`
-        };
+        if (!geoData[selectedLayer] && selectedLayer !== 'affectedPop') {
+          console.log(`Fetching layer data from: ${LAYERS[selectedLayer].endpoint}`);
+          const response = await fetch(LAYERS[selectedLayer].endpoint);
+          if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
 
-        const responses = await Promise.all(
-          Object.entries(endpoints).map(async ([key, url]) => {
-            const response = await fetch(url);
-            const data = await response.json();
-            return [key, data];
-          })
-        );
+          const data = await response.json();
+          console.log(`API response for ${selectedLayer}:`, data);
 
-        setImpactData(Object.fromEntries(responses));
+          if (!data.features || !Array.isArray(data.features)) throw new Error('Invalid JSON format');
+          setGeoData(prev => ({ ...prev, [selectedLayer]: data.features }));
+        }
+
+        if (selectedCountry) {
+          const regions = [...new Set(
+            geoData[selectedLayer]
+              ?.filter(f => f.properties.name_0 === selectedCountry)
+              .map(f => f.properties?.name_1)
+              .filter(Boolean)
+          )].sort();
+
+          console.log(`Regions for ${selectedCountry} in ${selectedLayer}:`, regions);
+          setAvailableRegions(regions);
+          setSelectedRegion('');
+
+          if (regions.length === 0) setError(`No regions found for ${selectedCountry} in ${selectedLayer}`);
+        }
+
+        const layerData = geoData[selectedLayer] || [];
+        const regionData = selectedRegion 
+          ? layerData.find(f => f.properties.name_1 === selectedRegion && f.properties.name_0 === selectedCountry)?.properties 
+          : null;
+
+        console.log(`Impact data for ${selectedRegion || 'all'} in ${selectedCountry || 'all'} (${selectedLayer}):`, regionData);
+        setImpactData(regionData);
       } catch (error) {
-        console.error('Error fetching impact data:', error);
+        console.error(`Error fetching ${selectedLayer} data:`, error);
+        setError(`Failed to load ${selectedLayer} data: ${error.message}`);
       }
     };
 
-    fetchImpactData();
-  }, [selectedAdmin]);
-
-  // Utility Functions
-  const processTimeSeriesData = (station) => {
-    if (!station?.properties) return [];
-
-    try {
-      const { 
-        time_period, 
-        'time_series_discharge_simulated-gfs': gfs, 
-        'time_series_discharge_simulated-icon': icon 
-      } = station.properties;
-      
-      const times = time_period.split(',');
-      const gfsValues = gfs.split(',').map(Number);
-      const iconValues = icon.split(',').map(Number);
-      
-      return times.map((time, i) => ({
-        time: time.split(' ')[0],
-        gfs: gfsValues[i],
-        icon: iconValues[i]
-      })).filter((_, index) => index % 6 === 0);
-    } catch (error) {
-      console.error('Error parsing time series data:', error);
-      return [];
-    }
-  };
-
-  const calculateMetrics = (data, threshold) => {
-    if (!data?.length) return null;
-
-    const gfsValues = data.map(d => d.gfs);
-    const iconValues = data.map(d => d.icon);
-
-    return {
-      maxGFS: Math.max(...gfsValues),
-      minGFS: Math.min(...gfsValues),
-      avgGFS: gfsValues.reduce((a, b) => a + b, 0) / gfsValues.length,
-      maxICON: Math.max(...iconValues),
-      minICON: Math.min(...iconValues),
-      avgICON: iconValues.reduce((a, b) => a + b, 0) / iconValues.length,
-      variabilityGFS: Math.sqrt(gfsValues.reduce((a, b) => 
-        a + Math.pow(b - (gfsValues.reduce((a, b) => a + b, 0) / gfsValues.length), 2), 0) / gfsValues.length),
-      variabilityICON: Math.sqrt(iconValues.reduce((a, b) => 
-        a + Math.pow(b - (iconValues.reduce((a, b) => a + b, 0) / iconValues.length), 2), 0) / iconValues.length),
-      thresholdExceededHours: threshold ? data.filter(d => d.gfs > threshold).length * 6 : 0,
-      peakIntensity: threshold ? ((Math.max(...gfsValues) / threshold) * 100) : 0
-    };
-  };
+    fetchLayerData();
+  }, [selectedLayer, selectedCountry, selectedRegion, geoData]);
 
   // Event Handlers
-  const handleAdminChange = (e) => {
-    setSelectedAdmin(e.target.value);
+  const handleCountryChange = (e) => setSelectedCountry(e.target.value);
+  const handleRegionChange = (e) => setSelectedRegion(e.target.value);
+  const handleLayerChange = (e) => {
+    setSelectedLayer(e.target.value);
+    setSelectedCountry('');
+    setSelectedRegion('');
+    setImpactData(null);
+    setAvailableRegions([]);
   };
 
-  const handleBasinChange = (e) => {
-    setSelectedBasin(e.target.value);
-  };
-
-  const handleStationChange = (e) => {
-    const stationId = e.target.value;
-    setSelectedStation(stationId);
-
-    const station = availableStations.find(s => s.properties.SEC_NAME === stationId);
-    if (station?.properties) {
-      setCurrentStationInfo(station.properties);
-      const data = processTimeSeriesData(station);
-      setTimeSeriesData(data);
-      setAnalysisMetrics(calculateMetrics(data, station.properties.Q_THR1));
-    }
-  };
-
-  // ==================== Export Functions ====================
+  // Export to PDF
   const exportToPDF = async () => {
     const element = document.getElementById('analysis-content');
     try {
@@ -244,110 +142,45 @@ const Analysis = () => {
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
-      // Header
       pdf.setFontSize(16);
-      pdf.text('Flood Impact Analysis Report', 20, 20);
-      
+      pdf.text('FloodProofs EA Impact Analysis', 20, 20);
       pdf.setFontSize(10);
       pdf.text(`Generated: ${new Date().toLocaleString()}`, 20, 30);
-      if (selectedAdmin) pdf.text(`Admin Area: ${selectedAdmin}`, 20, 40);
-      if (selectedBasin) pdf.text(`Basin: ${selectedBasin}`, 20, 45);
-      if (selectedStation) pdf.text(`Station: ${selectedStation}`, 20, 50);
+      if (selectedLayer) pdf.text(`Layer: ${LAYERS[selectedLayer].label}`, 20, 40);
+      if (selectedCountry) pdf.text(`Country: ${selectedCountry}`, 20, 50);
+      if (selectedRegion) pdf.text(`Region: ${selectedRegion}`, 20, 60);
 
-      // Main content
-      pdf.addImage(imgData, 'PNG', 0, 60, pdfWidth, pdfHeight);
-
-
-      // Regional discharge summary
-      if (regionalDischarge.length > 0) {
-        pdf.addPage();
-        pdf.setFontSize(14);
-        pdf.text('Regional Discharge Summary', 20, 20);
-        
-        let y = 40;
-        regionalDischarge.forEach(station => {
-          const metrics = calculateMetrics(station.data, station.threshold);
-          pdf.setFontSize(12);
-          pdf.text(`Station: ${station.name}`, 20, y);
-          y += 10;
-          
-          pdf.setFontSize(10);
-          pdf.text(`Max GFS: ${metrics.maxGFS.toFixed(2)} m³/s`, 30, y); y += 8;
-          pdf.text(`Max ICON: ${metrics.maxICON.toFixed(2)} m³/s`, 30, y); y += 8;
-          pdf.text(`Hours Above Threshold: ${metrics.thresholdExceededHours}`, 30, y);
-          y += 15;
-        });
-      }
-      
-      pdf.save(`flood_analysis_${selectedAdmin || selectedBasin || selectedStation}.pdf`);
+      pdf.addImage(imgData, 'PNG', 0, 70, pdfWidth, pdfHeight);
+      pdf.save(`floodproofs_ea_${selectedLayer}_${selectedCountry || 'all'}_${selectedRegion || 'all'}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
+      setError('Failed to generate PDF');
     }
   };
 
+  // Export to CSV
   const exportToCSV = () => {
-    const headers = [
-      'Date',
-      'Station',
-      'GFS Discharge (m³/s)',
-      'ICON Discharge (m³/s)',
-      'Alert Threshold (m³/s)',
-      'Population Affected',
-      'GDP Impact ($)',
-      'Cropland (ha)',
-      'Roads (km)'
-    ];
-
+    const headers = ['Country', 'Region', 'Stock', 'Flood Percentage', 'Flood Total'];
     let rows = [];
-    if (selectedStation && timeSeriesData.length) {
-      // Single station export
-      rows = timeSeriesData.map(row => [
-        row.time,
-        selectedStation,
-        row.gfs?.toFixed(2),
-        row.icon?.toFixed(2),
-        currentStationInfo?.Q_THR1,
-        impactData.population?.affected || '',
-        impactData.gdp?.value || '',
-        impactData.crops?.affected || '',
-        impactData.roads?.length || ''
-      ]);
-    } else if (regionalDischarge.length) {
-      // Regional data export
-      regionalDischarge.forEach(station => {
-        rows.push(...station.data.map(row => [
-          row.time,
-          station.name,
-          row.gfs?.toFixed(2),
-          row.icon?.toFixed(2),
-          station.threshold,
-          impactData.population?.affected || '',
-          impactData.gdp?.value || '',
-          impactData.crops?.affected || '',
-          impactData.roads?.length || ''
-        ]));
-      });
+
+    if (selectedRegion && impactData) {
+      rows.push([selectedCountry, selectedRegion, impactData.stock?.toLocaleString() || '', impactData.flood_perc?.toFixed(1) || '', impactData.flood_tot?.toLocaleString() || '']);
+    } else if (selectedCountry) {
+      rows = geoData[selectedLayer]?.filter(f => f.properties.name_0 === selectedCountry).map(f => [f.properties.name_0, f.properties.name_1, f.properties.stock?.toLocaleString() || '', f.properties.flood_perc?.toFixed(1) || '', f.properties.flood_tot?.toLocaleString() || '']) || [];
     }
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
-
+    const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', 
-      `flood_analysis_${selectedAdmin || selectedBasin || selectedStation}.csv`
-    );
+    link.setAttribute('download', `floodproofs_ea_${selectedLayer}_${selectedCountry || 'all'}_${selectedRegion || 'all'}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // ==================== Render Functions ====================
-
+  // Render
   if (loading) {
     return (
       <Container className="text-center py-5">
@@ -360,16 +193,15 @@ const Analysis = () => {
 
   return (
     <Container fluid className="py-4" id="analysis-content">
-      {/* Header */}
       <Row className="mb-4">
         <Col>
           <div className="d-flex justify-content-between align-items-center">
-            <h2>Flood Impact Analysis</h2>
+            <h2 className="display-6 fw-bold">FloodProofs EA Impact Analysis</h2>
             <div>
-              <Button variant="outline-primary" className="me-2" onClick={exportToPDF}>
+              <Button variant="outline-primary" className="me-2" onClick={exportToPDF} disabled={!selectedCountry}>
                 <FileText className="me-1" size={16} /> Export PDF
               </Button>
-              <Button variant="outline-primary" onClick={exportToCSV}>
+              <Button variant="outline-primary" onClick={exportToCSV} disabled={!selectedCountry}>
                 <FileSpreadsheet className="me-1" size={16} /> Export CSV
               </Button>
             </div>
@@ -377,58 +209,48 @@ const Analysis = () => {
         </Col>
       </Row>
 
-      {/* Filters */}
+      {error && (
+        <Alert variant="danger" onClose={() => setError(null)} dismissible>
+          <Alert.Heading>Error</Alert.Heading>
+          <p>{error}</p>
+        </Alert>
+      )}
+
       <Card className="mb-4 shadow-sm">
         <Card.Header className="bg-primary text-white">
-          <h5 className="mb-0">Analysis Filters</h5>
+          <h5 className="mb-0 fw-bold">Analysis Filters</h5>
         </Card.Header>
         <Card.Body>
           <Row>
             <Col md={4}>
               <Form.Group>
-                <Form.Label className="fw-bold">Administrative Area</Form.Label>
-                <Form.Select 
-                  value={selectedAdmin}
-                  onChange={handleAdminChange}
-                  className="border-2"
-                >
-                  <option value="">Select Administrative Area...</option>
-                  {availableAdmins.map(admin => (
-                    <option key={admin} value={admin}>{admin}</option>
+                <Form.Label className="fw-bold">Impact Layer</Form.Label>
+                <Form.Select value={selectedLayer} onChange={handleLayerChange} className="border-2">
+                  <option value="">Select an Impact Layer</option>
+                  {Object.entries(LAYERS).map(([key, { label }]) => (
+                    <option key={key} value={key}>{label}</option>
                   ))}
                 </Form.Select>
               </Form.Group>
             </Col>
             <Col md={4}>
               <Form.Group>
-                <Form.Label className="fw-bold">Basin</Form.Label>
-                <Form.Select 
-                  value={selectedBasin}
-                  onChange={handleBasinChange}
-                  disabled={!selectedAdmin}
-                  className="border-2"
-                >
-                  <option value="">Select Basin...</option>
-                  {availableBasins.map(basin => (
-                    <option key={basin} value={basin}>{basin}</option>
+                <Form.Label className="fw-bold">Country</Form.Label>
+                <Form.Select value={selectedCountry} onChange={handleCountryChange} className="border-2" disabled={!selectedLayer}>
+                  <option value="">Select a Country</option>
+                  {availableCountries.map(country => (
+                    <option key={country} value={country}>{country}</option>
                   ))}
                 </Form.Select>
               </Form.Group>
             </Col>
             <Col md={4}>
               <Form.Group>
-                <Form.Label className="fw-bold">Station</Form.Label>
-                <Form.Select 
-                  value={selectedStation}
-                  onChange={handleStationChange}
-                  disabled={!selectedBasin}
-                  className="border-2"
-                >
-                  <option value="">Select Station...</option>
-                  {availableStations.map(station => (
-                    <option key={station.properties.SEC_NAME} value={station.properties.SEC_NAME}>
-                      {station.properties.SEC_NAME}
-                    </option>
+                <Form.Label className="fw-bold">Region</Form.Label>
+                <Form.Select value={selectedRegion} onChange={handleRegionChange} className="border-2" disabled={!selectedCountry || availableRegions.length === 0}>
+                  <option value="">Select a Region (Optional)</option>
+                  {availableRegions.map(region => (
+                    <option key={region} value={region}>{region}</option>
                   ))}
                 </Form.Select>
               </Form.Group>
@@ -437,409 +259,99 @@ const Analysis = () => {
         </Card.Body>
       </Card>
 
-      {/* Regional Discharge Analysis */}
-      {regionalDischarge.length > 0 && (
+      {selectedLayer && selectedCountry && geoData[selectedLayer] ? (
         <Card className="mb-4 shadow-sm">
-          <Card.Header className="bg-success text-white">
-            <h5 className="mb-0">Regional Discharge Analysis - {selectedBasin}</h5>
+          <Card.Header className="bg-warning text-dark">
+            <h5 className="mb-0 fw-bold">
+              {LAYERS[selectedLayer].label} Analysis - {selectedCountry} 
+              {selectedRegion ? ` - ${selectedRegion}` : ' (All Regions)'}
+            </h5>
           </Card.Header>
           <Card.Body>
-            {/* <ResponsiveContainer width="100%" height={400}>
-              <ComposedChart>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="time"
-                  allowDuplicatedCategory={false}
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                  interval={0}
-                  fontSize={12}
-                />
-                <YAxis 
-                  label={{ 
-                    value: 'Discharge (m³/s)', 
-                    angle: -90, 
-                    position: 'insideLeft',
-                    style: { fontSize: 12 }
-                  }}
-                />
-                <Tooltip 
-                  formatter={(value, name) => [
-                    `${value?.toFixed(2)} m³/s`,
-                    name.split('_')[0]
-                  ]}
-                />
-                <Legend />
-                {regionalDischarge.map((station, idx) => (
-                  <React.Fragment key={station.name}>
-                    <Line 
-                      data={station.data}
-                      type="monotone"
-                      dataKey="gfs"
-                      name={`${station.name}_GFS`}
-                      stroke={`hsl(${(idx * 30) % 360}, 70%, 50%)`}
-                      dot={{ r: 1 }}
-                    />
-                    <Line 
-                      data={station.data}
-                      type="monotone"
-                      dataKey="icon"
-                      name={`${station.name}_ICON`}
-                      stroke={`hsl(${((idx * 30) + 15) % 360}, 70%, 50%)`}
-                      dot={{ r: 1 }}
-                      strokeDasharray="5 5"
-                    />
-                  </React.Fragment>
-                ))}
-              </ComposedChart>
-            </ResponsiveContainer> */}
-
-            <div className="mt-4">
-              <h6 className="fw-bold mb-3">Regional Station Analysis</h6>
-              <Table striped bordered hover responsive>
-                <thead>
-                  <tr>
-                    <th>Station</th>
-                    <th>Max GFS (m³/s)</th>
-                    <th>Max ICON (m³/s)</th>
-                    <th>Alert Threshold (m³/s)</th>
-                    <th>Hours Above Threshold</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {regionalDischarge.map(station => {
-                    const metrics = calculateMetrics(station.data, station.threshold);
-                    return (
-                      <tr key={station.name}>
-                        <td>{station.name}</td>
-                        <td className={metrics.maxGFS > station.threshold ? 'text-danger fw-bold' : ''}>
-                          {metrics.maxGFS.toFixed(2)}
-                        </td>
-                        <td className={metrics.maxICON > station.threshold ? 'text-danger fw-bold' : ''}>
-                          {metrics.maxICON.toFixed(2)}
-                        </td>
-                        <td>{station.threshold}</td>
-                        <td className={metrics.thresholdExceededHours > 24 ? 'text-danger fw-bold' : ''}>
-                          {metrics.thresholdExceededHours}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </Table>
-            </div>
-          </Card.Body>
-        </Card>
-      )}
-
-      {/* Impact Analysis
-      {selectedAdmin && impactData && (
-        <Card className="mb-4 shadow-sm">
-          <Card.Header className="bg-warning">
-            <h5 className="mb-0">Impact Analysis - {selectedAdmin}</h5>
-          </Card.Header>
-          <Card.Body>
-            <Row>
-              <Col md={4}>
-                <Card className="mb-3">
-                  <Card.Header className="bg-primary text-white">
-                    <h6 className="mb-0">Population Impact</h6>
-                  </Card.Header>
-                  <Card.Body>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <PieChart>
-                        <Pie
-                          data={[
-                            { name: 'Affected', value: impactData.population?.affected || 0 },
-                            { 
-                              name: 'Unaffected', 
-                              value: (impactData.population?.total || 0) - 
-                                    (impactData.population?.affected || 0) 
-                            }
-                          ]}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={40}
-                          outerRadius={80}
-                        >
-                          <Cell fill="#ff7675" />
-                          <Cell fill="#74b9ff" />
-                        </Pie>
-                        <Tooltip formatter={(value) => value.toLocaleString()} />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="text-center mt-3">
-                      <h6>Total: {impactData.population?.total?.toLocaleString()}</h6>
-                      <h6>Affected: {impactData.population?.affected?.toLocaleString()}</h6>
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-
-              <Col md={4}>
-                <Card className="mb-3">
-                  <Card.Header className="bg-success text-white">
-                    <h6 className="mb-0">Land Use Impact</h6>
-                  </Card.Header>
-                  <Card.Body>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={[
-                        { name: 'Cropland', affected: impactData.crops?.affected || 0 },
-                        { name: 'Grazing', affected: impactData.grazingLand?.affected || 0 }
-                      ]}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis label={{ 
-                          value: 'Hectares', 
-                          angle: -90, 
-                          position: 'insideLeft',
-                          style: { fontSize: 12 }
-                        }} />
-                        <Tooltip formatter={(value) => `${value.toLocaleString()} ha`} />
-                        <Bar dataKey="affected" fill="#55efc4" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </Card.Body>
-                </Card>
-              </Col>
-
-              <Col md={4}>
-                <Card className="mb-3">
-                  <Card.Header className="bg-info text-white">
-                    <h6 className="mb-0">Economic Impact</h6>
-                  </Card.Header>
-                  <Card.Body>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={[
-                        { name: 'GDP', value: impactData.gdp?.value || 0 },
-                        { name: 'Agriculture', value: impactData.crops?.value || 0 },
-                        { name: 'Livestock', value: impactData.livestock?.value || 0 }
-                      ]}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis label={{ 
-                          value: 'USD', 
-                          angle: -90, 
-                          position: 'insideLeft',
-                          style: { fontSize: 12 }
-                        }} />
-                        <Tooltip formatter={(value) => `$${value.toLocaleString()}`} />
-                        <Bar dataKey="value" fill="#a29bfe" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </Card.Body>
-                </Card>
-              </Col>
-            </Row>
-
-            <Table striped bordered hover responsive className="mt-4">
-              <thead>
-                <tr>
-                  <th>Category</th>
-                  <th>Total</th>
-                  <th>Affected</th>
-                  <th>Percentage</th>
-                  <th>Economic Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Population</td>
-                  <td>{impactData.population?.total?.toLocaleString()}</td>
-                  <td>{impactData.population?.affected?.toLocaleString()}</td>
-                  <td>
-                    {((impactData.population?.affected / impactData.population?.total) * 100 || 0).toFixed(1)}%
-                  </td>
-                  <td>-</td>
-                </tr>
-                <tr>
-                  <td>Cropland</td>
-                  <td>{impactData.crops?.total?.toLocaleString()} ha</td>
-                  <td>{impactData.crops?.affected?.toLocaleString()} ha</td>
-                  <td>
-                    {((impactData.crops?.affected / impactData.crops?.total) * 100 || 0).toFixed(1)}%
-                  </td>
-                  <td>${impactData.crops?.value?.toLocaleString()}</td>
-                </tr>
-                <tr>
-                  <td>Grazing Land</td>
-                  <td>{impactData.grazingLand?.total?.toLocaleString()} ha</td>
-                  <td>{impactData.grazingLand?.affected?.toLocaleString()} ha</td>
-                  <td>
-                    {((impactData.grazingLand?.affected / impactData.grazingLand?.total) * 100 || 0).toFixed(1)}%
-                  </td>
-                  <td>${impactData.grazingLand?.value?.toLocaleString()}</td>
-                </tr>
-                <tr>
-                  <td>Roads</td>
-                  <td>{impactData.roads?.total?.toLocaleString()} km</td>
-                  <td>{impactData.roads?.length?.toLocaleString()} km</td>
-                  <td>
-                    {((impactData.roads?.length / impactData.roads?.total) * 100 || 0).toFixed(1)}%
-                  </td>
-                  <td>${impactData.roads?.value?.toLocaleString()}</td>
-                </tr>
-              </tbody>
-            </Table>
-          </Card.Body>
-        </Card>
-      )} */}
-
-      {/* Station Analysis */}
-      {currentStationInfo && (
-        <Card className="mb-4 shadow-sm">
-          <Card.Header className="bg-info text-white">
-            <h5 className="mb-0">Station Analysis - {currentStationInfo.SEC_NAME}</h5>
-          </Card.Header>
-          <Card.Body>
-            <Row>
-              <Col md={3}>
-                <Card className="text-center shadow-sm h-100">
-                  <Card.Body>
-                    <h6 className="fw-bold mb-3">Basin</h6>
-                    <p className="mb-0 fs-5">{currentStationInfo.BASIN}</p>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col md={3}>
-                <Card className="text-center shadow-sm h-100">
-                  <Card.Body>
-                    <h6 className="fw-bold mb-3">Area</h6>
-                    <p className="mb-0 fs-5">{currentStationInfo.AREA} km²</p>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col md={3}>
-                <Card className="text-center shadow-sm h-100">
-                  <Card.Body>
-                    <h6 className="fw-bold mb-3">Location</h6>
-                    <p className="mb-0">
-                      <span className="fs-5">{currentStationInfo.latitude?.toFixed(4)}°N</span><br/>
-                      <span className="fs-5">{currentStationInfo.longitude?.toFixed(4)}°E</span>
-                    </p>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col md={3}>
-                <Card className="text-center shadow-sm h-100 bg-warning bg-opacity-10">
-                  <Card.Body>
-                    <h6 className="fw-bold mb-3">Alert Threshold</h6>
-                    <p className="mb-0 fs-5">{currentStationInfo.Q_THR1} m³/s</p>
-                  </Card.Body>
-                </Card>
-              </Col>
-            </Row>
-
-            <Row className="mt-4">
-              <Col>
-                <h6 className="fw-bold mb-3">Discharge Analysis</h6>
-                <ResponsiveContainer width="100%" height={400}>
-                  <ComposedChart data={timeSeriesData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="time" 
-                      angle={-45} 
-                      textAnchor="end" 
-                      height={60}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <YAxis 
-                      label={{ 
-                        value: 'Discharge (m³/s)', 
-                        angle: -90, 
-                        position: 'insideLeft',
-                        style: { fontSize: 12 }
-                      }}
-                    />
-                    <Tooltip formatter={(value) => [`${value.toFixed(2)} m³/s`]} />
-                    <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="gfs" 
-                      stroke="#4169E1" 
-                      name="GFS Forecast"
-                      dot={{ r: 1 }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="icon" 
-                      stroke="#32CD32" 
-                      name="ICON Forecast"
-                      dot={{ r: 1 }}
-                    />
-                    {currentStationInfo.Q_THR1 && (
-                      <Line
-                        type="monotone"
-                        dataKey={() => currentStationInfo.Q_THR1}
-                        stroke="#FF0000"
-                        strokeDasharray="5 5"
-                        name="Alert Threshold"
-                      />
-                    )}
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </Col>
-            </Row>
-
-            {analysisMetrics && (
-              <Row className="mt-4">
-                <Col>
-                  <h6 className="fw-bold mb-3">Statistical Analysis</h6>
+            {selectedRegion && impactData ? (
+              <Row>
+                <Col md={4}>
+                  <Card className="mb-3">
+                    <Card.Header className="bg-primary text-white">
+                      <h6 className="mb-0 fw-bold">Impact Breakdown</h6>
+                    </Card.Header>
+                    <Card.Body>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { name: 'Flooded', value: impactData.flood_tot || 0 },
+                              { name: 'Stock', value: impactData.stock || 0 }
+                            ]}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={90}
+                            label={({ name, value }) => `${name}: ${value.toLocaleString()}`}
+                            labelLine={false}
+                          >
+                            <Cell fill="#ff7675" />
+                            <Cell fill="#74b9ff" />
+                          </Pie>
+                          <Tooltip formatter={(value) => value.toLocaleString()} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </Card.Body>
+                  </Card>
+                </Col>
+                <Col md={8}>
                   <Table striped bordered hover responsive>
                     <thead>
                       <tr>
                         <th>Metric</th>
-                        <th>GFS Forecast</th>
-                        <th>ICON Forecast</th>
+                        <th>Value</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td>Maximum Discharge</td>
-                        <td className={analysisMetrics.maxGFS > currentStationInfo.Q_THR1 ? 'text-danger fw-bold' : ''}>
-                          {analysisMetrics.maxGFS.toFixed(2)} m³/s
-                        </td>
-                        <td className={analysisMetrics.maxICON > currentStationInfo.Q_THR1 ? 'text-danger fw-bold' : ''}>
-                          {analysisMetrics.maxICON.toFixed(2)} m³/s
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Minimum Discharge</td>
-                        <td>{analysisMetrics.minGFS.toFixed(2)} m³/s</td>
-                        <td>{analysisMetrics.minICON.toFixed(2)} m³/s</td>
-                      </tr>
-                      <tr>
-                        <td>Average Discharge</td>
-                        <td>{analysisMetrics.avgGFS.toFixed(2)} m³/s</td>
-                        <td>{analysisMetrics.avgICON.toFixed(2)} m³/s</td>
-                      </tr>
-                      <tr>
-                        <td>Variability (Std Dev)</td>
-                        <td>{analysisMetrics.variabilityGFS.toFixed(2)} m³/s</td>
-                        <td>{analysisMetrics.variabilityICON.toFixed(2)} m³/s</td>
-                      </tr>
-                      <tr>
-                        <td>Hours Above Threshold</td>
-                        <td colSpan="2" className={analysisMetrics.thresholdExceededHours > 24 ? 'text-danger fw-bold' : ''}>
-                          {analysisMetrics.thresholdExceededHours}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Peak Intensity (% of threshold)</td>
-                        <td colSpan="2" className={analysisMetrics.peakIntensity > 150 ? 'text-danger fw-bold' : ''}>
-                          {analysisMetrics.peakIntensity.toFixed(1)}%
-                        </td>
-                      </tr>
+                      <tr><td>Stock</td><td>{impactData.stock?.toLocaleString()}</td></tr>
+                      <tr><td>Flood Total</td><td>{impactData.flood_tot?.toLocaleString()}</td></tr>
+                      <tr><td>Flood Percentage</td><td>{impactData.flood_perc?.toFixed(1)}%</td></tr>
+                      <tr><td>Country</td><td>{impactData.name_0}</td></tr>
+                      <tr><td>Region</td><td>{impactData.name_1}</td></tr>
+                      <tr><td>Province Code</td><td>{impactData.cod}</td></tr>
                     </tbody>
                   </Table>
+                </Col>
+              </Row>
+            ) : (
+              <Row>
+                <Col>
+                  <h6 className="fw-bold mb-3">Comparison Across Regions in {selectedCountry}</h6>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart data={geoData[selectedLayer]
+                      ?.filter(f => f.properties.name_0 === selectedCountry)
+                      .map(f => ({
+                        name: f.properties.name_1,
+                        stock: f.properties.stock,
+                        flood_tot: f.properties.flood_tot
+                      }))}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} />
+                      <YAxis />
+                      <Tooltip formatter={(value) => value.toLocaleString()} />
+                      <Legend />
+                      <Bar dataKey="stock" fill="#74b9ff" name="Stock" />
+                      <Bar dataKey="flood_tot" fill="#ff7675" name="Flooded" />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </Col>
               </Row>
             )}
           </Card.Body>
         </Card>
-      )}
+      ) : selectedLayer ? (
+        <Card className="text-center p-4">
+          <Card.Body>
+            <h5 className="text-muted">Please select a country to view analysis</h5>
+          </Card.Body>
+        </Card>
+      ) : null}
     </Container>
   );
 };

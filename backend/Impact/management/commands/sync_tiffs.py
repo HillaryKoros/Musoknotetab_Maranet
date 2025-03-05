@@ -11,6 +11,15 @@ import traceback
 import time
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
+import rasterio
+import rasterio.warp
+import numpy as np
+from rasterio.transform import from_origin
+try:
+    from osgeo import gdal
+    GDAL_AVAILABLE = True
+except ImportError:
+    GDAL_AVAILABLE = False
 
 class Command(BaseCommand):
     help = 'Sync remote TIFF files from SFTP and publish to GeoServer with fallback to previous day'
@@ -29,9 +38,12 @@ class Command(BaseCommand):
             'group4_alert': 'group4_mosaic_alert_level.tif'
         }
         
+        # Merged alerts file path
+        self.merged_alerts_file = os.path.join(self.temp_dir, 'merged_alerts.tif')
+        
         # GeoServer configuration with URL switching
-        self.primary_geoserver_url = 'http://10.10.1.13:8093/geoserver'
-        self.fallback_geoserver_url = 'http://geoserver:8080/geoserver'
+        self.primary_geoserver_url =  'http://flood_watch_geoserver:8080/geoserver'
+        self.fallback_geoserver_url = 'http://10.10.1.13:8093/geoserver'
         self.geoserver_url = self.primary_geoserver_url  # Start with primary URL
         self.geoserver_username = config('GEOSERVER_USERNAME', default='admin')
         self.geoserver_password = config('GEOSERVER_PASSWORD', default='geoserver')
@@ -152,6 +164,7 @@ class Command(BaseCommand):
                 self.sftp = self.connect_sftp()
             
             if self.sync_tiffs(date):
+                # Skip merging and directly publish all files to GeoServer
                 self.publish_to_geoserver(date)
                 return True
             return False
@@ -197,21 +210,301 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f"Error during sync: {str(e)}"))
             return False
 
+    def merge_alert_files(self):
+        """Merge the three alert TIFF files into a mosaic raster file with detailed analysis"""
+        self.stdout.write("Merging alert files...")
+        
+        try:
+            # Step 1: Get paths and validate alert files
+            alert_files = []
+            
+            for store_name, filename_template in self.tiff_configurations.items():
+                if 'alert' in store_name:
+                    filename = filename_template.format(date=self.current_date.strftime('%Y%m%d'))
+                    file_path = os.path.join(self.temp_dir, filename)
+                    
+                    if os.path.exists(file_path):
+                        alert_files.append({
+                            'path': file_path,
+                            'name': store_name,
+                            'filename': filename
+                        })
+            
+            if not alert_files:
+                self.stdout.write(self.style.WARNING("No alert files found to merge"))
+                return False
+            
+            self.stdout.write(f"Found {len(alert_files)} alert files to merge: {[f['name'] for f in alert_files]}")
+            
+            # Step 2: Analyze the geographical extents of each file
+            extents = []
+            
+            for file_info in alert_files:
+                try:
+                    with rasterio.open(file_info['path']) as src:
+                        bounds = src.bounds
+                        extents.append({
+                            'name': file_info['name'],
+                            'bounds': bounds,
+                            'width': src.width,
+                            'height': src.height,
+                            'crs': src.crs
+                        })
+                        
+                        self.stdout.write(f"Geographical extent for {file_info['name']}:")
+                        self.stdout.write(f"  - Bounds: {bounds}")
+                        self.stdout.write(f"  - Size: {src.width}x{src.height} pixels")
+                        self.stdout.write(f"  - CRS: {src.crs}")
+                        
+                        # Read a sample of data to check for valid pixels
+                        data = src.read(1)
+                        nodata = src.nodata if src.nodata is not None else 0
+                        valid_mask = data != nodata
+                        valid_count = np.sum(valid_mask)
+                        self.stdout.write(f"  - Valid pixels: {valid_count} ({valid_count/data.size*100:.2f}%)")
+                        
+                except Exception as e:
+                    self.stdout.write(self.style.ERROR(
+                        f"Error analyzing {file_info['name']}: {str(e)}"
+                    ))
+            
+            # Step 3: Check for overlaps between the alert files
+            if len(extents) >= 2:
+                self.stdout.write("Analyzing overlaps between alert files:")
+                
+                for i in range(len(extents)):
+                    for j in range(i+1, len(extents)):
+                        # Check if the two extents overlap
+                        e1 = extents[i]['bounds']
+                        e2 = extents[j]['bounds']
+                        
+                        # Two bounding boxes overlap if:
+                        # - One box's left edge is to the left of the other's right edge, AND
+                        # - One box's right edge is to the right of the other's left edge, AND
+                        # - One box's bottom edge is below the other's top edge, AND
+                        # - One box's top edge is above the other's bottom edge
+                        overlaps = (
+                            e1.left < e2.right and 
+                            e1.right > e2.left and 
+                            e1.bottom < e2.top and 
+                            e1.top > e2.bottom
+                        )
+                        
+                        self.stdout.write(f"  - {extents[i]['name']} and {extents[j]['name']}: " + 
+                                         f"{'OVERLAP' if overlaps else 'NO OVERLAP'}")
+                
+                # Calculate total extent that encompasses all alert files
+                total_left = min(e['bounds'].left for e in extents)
+                total_right = max(e['bounds'].right for e in extents)
+                total_bottom = min(e['bounds'].bottom for e in extents)
+                total_top = max(e['bounds'].top for e in extents)
+                
+                self.stdout.write("Total geographical extent needed for merged file:")
+                self.stdout.write(f"  - Width: {total_left} to {total_right}")
+                self.stdout.write(f"  - Height: {total_bottom} to {total_top}")
+                
+                # Calculate approximate resolution
+                avg_res_x = sum((e['bounds'].right - e['bounds'].left) / e['width'] for e in extents) / len(extents)
+                avg_res_y = sum((e['bounds'].top - e['bounds'].bottom) / e['height'] for e in extents) / len(extents)
+                
+                self.stdout.write(f"Average resolution: ~{avg_res_x:.8f} x ~{avg_res_y:.8f} degrees/pixel")
+                
+                # Estimate merged file size
+                est_width = int((total_right - total_left) / avg_res_x)
+                est_height = int((total_top - total_bottom) / avg_res_y)
+                
+                self.stdout.write(f"Estimated merged file size: ~{est_width}x{est_height} pixels")
+                
+                if est_width > 10000 or est_height > 10000:
+                    self.stdout.write(self.style.WARNING(
+                        f"Merged file could be very large ({est_width}x{est_height}). " + 
+                        "Consider using a multi-band approach."
+                    ))
+            
+            # Step 4: Try different merging strategies based on analysis results
+            # First, try GDAL's BuildVRT which handles different projections and resolutions well
+            input_files = [f['path'] for f in alert_files]
+            
+            if GDAL_AVAILABLE:
+                try:
+                    self.stdout.write("Attempting to merge with GDAL BuildVRT...")
+                    
+                    # Create VRT path
+                    vrt_path = os.path.join(self.temp_dir, 'merged_alerts.vrt')
+                    
+                    # Run gdalbuildvrt
+                    gdal.UseExceptions()
+                    vrt_options = gdal.BuildVRTOptions(resampleAlg='nearest', separate=False)
+                    vrt = gdal.BuildVRT(vrt_path, input_files, options=vrt_options)
+                    
+                    if vrt:
+                        # Get reference values from first file
+                        with rasterio.open(alert_files[0]['path']) as src:
+                            ref_nodata = src.nodata if src.nodata is not None else 0
+                        
+                        # Translate to GeoTIFF
+                        translate_options = gdal.TranslateOptions(
+                            format='GTiff',
+                            noData=ref_nodata,
+                            creationOptions=['COMPRESS=LZW']
+                        )
+                        gdal.Translate(self.merged_alerts_file, vrt, options=translate_options)
+                        vrt = None  # Close the dataset
+                        
+                        # Verify the output
+                        if os.path.exists(self.merged_alerts_file):
+                            with rasterio.open(self.merged_alerts_file) as src:
+                                data = src.read(1)
+                                nodata = src.nodata if src.nodata is not None else ref_nodata
+                                valid_mask = data != nodata
+                                valid_count = np.sum(valid_mask)
+                                
+                                self.stdout.write(f"GDAL BuildVRT merged file stats:")
+                                self.stdout.write(f"  - Shape: {data.shape}")
+                                self.stdout.write(f"  - Valid pixels: {valid_count} ({valid_count/data.size*100:.2f}%)")
+                                
+                                if valid_count > 0:
+                                    self.stdout.write(self.style.SUCCESS(
+                                        f"Alert files successfully merged with GDAL BuildVRT"
+                                    ))
+                                    return True
+                                else:
+                                    self.stdout.write(self.style.WARNING(
+                                        "GDAL BuildVRT created a file with no valid data, trying multi-band approach"
+                                    ))
+                        else:
+                            self.stdout.write(self.style.WARNING(
+                                "GDAL BuildVRT failed to create output file, trying multi-band approach"
+                            ))
+                except Exception as e:
+                    self.stdout.write(self.style.WARNING(
+                        f"GDAL BuildVRT error: {str(e)}, trying multi-band approach"
+                    ))
+            
+            # Multi-band approach: create a raster with each alert as a separate band
+            self.stdout.write("Creating multi-band raster with each alert in a separate band...")
+            
+            # Use the first file's metadata as a template
+            with rasterio.open(alert_files[0]['path']) as src:
+                out_meta = src.meta.copy()
+                
+                # Update for multi-band output
+                out_meta.update({
+                    'count': len(alert_files),  # One band per alert file
+                    'compress': 'lzw'
+                })
+                
+                # Create the output file
+                with rasterio.open(self.merged_alerts_file, 'w', **out_meta) as dst:
+                    # Write each alert file as a separate band
+                    for band_idx, file_info in enumerate(alert_files, start=1):
+                        self.stdout.write(f"Writing {file_info['name']} to band {band_idx}")
+                        
+                        with rasterio.open(file_info['path']) as src:
+                            data = src.read(1)
+                            dst.write(data, band_idx)
+            
+            # Verify the multi-band output
+            with rasterio.open(self.merged_alerts_file) as src:
+                self.stdout.write(f"Multi-band file stats:")
+                self.stdout.write(f"  - Shape: {src.shape}")
+                self.stdout.write(f"  - Bands: {src.count}")
+                
+                # Check data in each band
+                for band in range(1, src.count + 1):
+                    data = src.read(band)
+                    nodata = src.nodata if src.nodata is not None else 0
+                    valid_mask = data != nodata
+                    valid_count = np.sum(valid_mask)
+                    
+                    self.stdout.write(f"  - Band {band} valid pixels: {valid_count} ({valid_count/data.size*100:.2f}%)")
+            
+            self.stdout.write(self.style.SUCCESS(
+                f"Created multi-band alert file with each alert in a separate band"
+            ))
+            return True
+            
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(
+                f"Error merging alert files: {str(e)}\n"
+                f"Stack trace: {traceback.format_exc()}"
+            ))
+            
+            # Fall back to publishing individual alert files
+            self.stdout.write(self.style.WARNING(
+                "Falling back to publishing individual alert files"
+            ))
+            return True  # Continue with individual files
+            
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(
+                f"Error merging alert files: {str(e)}\n"
+                f"Stack trace: {traceback.format_exc()}"
+            ))
+            return False
+
     def publish_to_geoserver(self, date):
         """Publish TIFF files to GeoServer with improved error handling"""
         store_date = date.strftime('%Y%m%d')
         iso_date = date.strftime('%Y-%m-%dT%H:%M:%SZ')
         
-        for store_name, filename_template in self.tiff_configurations.items():
-            filename = filename_template.format(date=store_date)
+        # Check if merged alerts file exists
+        merged_alerts_exists = os.path.exists(self.merged_alerts_file)
+        
+        if merged_alerts_exists:
+            # Validate merged file before using it
+            try:
+                with rasterio.open(self.merged_alerts_file) as src:
+                    data = src.read(1)
+                    nodata = src.nodata if src.nodata is not None else 0
+                    # Check if the file has any valid data (non-nodata values)
+                    valid_data = data[data != nodata]
+                    if len(valid_data) == 0:
+                        self.stdout.write(self.style.WARNING(
+                            "Merged alerts file exists but contains no valid data. "
+                            "Using individual alert files instead."
+                        ))
+                        merged_alerts_exists = False
+                    else:
+                        self.stdout.write(self.style.SUCCESS(
+                            f"Validated merged alerts file: {len(valid_data)} valid pixels"
+                        ))
+            except Exception as e:
+                self.stdout.write(self.style.WARNING(
+                    f"Error validating merged alerts file: {str(e)}. "
+                    "Using individual alert files instead."
+                ))
+                merged_alerts_exists = False
+        
+        # Create publishing configuration
+        if merged_alerts_exists:
+            # Use merged alerts file if it exists and is valid
+            self.stdout.write("Using merged alerts file for publishing")
+            publish_configurations = {
+                'flood_hazard': self.tiff_configurations['flood_hazard'].format(date=store_date),
+                'alerts': 'merged_alerts.tif'  # Use the merged alerts file
+            }
+        else:
+            # Fall back to individual alert files
+            self.stdout.write("Using individual alert files for publishing")
+            publish_configurations = {
+                'flood_hazard': self.tiff_configurations['flood_hazard'].format(date=store_date)
+            }
+            
+            # Add individual alert files
+            for store_name, filename_template in self.tiff_configurations.items():
+                if 'alert' in store_name:
+                    publish_configurations[store_name] = filename_template.format(date=store_date)
+        
+        for store_name, filename in publish_configurations.items():
             local_path = os.path.join(self.temp_dir, filename)
             
             if not os.path.exists(local_path):
                 self.stdout.write(self.style.WARNING(f"Skipping {filename} - file not found"))
                 continue
             
-            # Only add date to store name if it's not an alert layer
-            dated_store_name = store_name if 'alert' in store_name else f"{store_name}_{store_date}"
+            # Only add date to store name if it's not the alerts layer
+            dated_store_name = store_name if store_name == 'alerts' else f"{store_name}_{store_date}"
             self.stdout.write(f"Publishing {filename} to GeoServer as {dated_store_name}...")
             
             try:

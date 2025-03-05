@@ -7,7 +7,8 @@ services:
    volumes:
      - static_volume:/backend/staticfiles
      - media_volume:/backend/mediafiles
-     - ./shared_data:/backend/data
+     - ./shared_data:/backend/data:rw
+     - ./frontend/public:/frontend/public
    ports:
      - "8090:8000"
    environment:
@@ -118,7 +119,7 @@ services:
    volumes:
      - static_volume:/frontend/static
      - media_volume:/frontend/media
-     - ./shared_data:/usr/share/nginx/html/data
+     - ./shared_data:/usr/share/nginx/html/data:rw
    environment:
      - NODE_ENV=production
      - VITE_API_URL=http://10.10.1.13:8090
@@ -154,4 +155,6 @@ volumes:
  geoserver_data:
    driver: local
  geoserver_styles:
+   driver: local
+ shared_data_volume:
    driver: local

@@ -50,3 +50,4 @@ backend/data/
 temp_data/
 temp_rasters/
 uploads/
+static_data/

@@ -25,16 +25,54 @@ class Command(BaseCommand):
         return base_path, full_path, base_date
 
     def get_frontend_public_dir(self):
-        """Get the correct path to frontend/public directory."""
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-        project_root = os.path.dirname(backend_dir)
-        frontend_public = os.path.join(project_root, 'frontend', 'public')
+        """Get the correct path to the data directory with write permission check."""
+        # First check if path is specified in environment
+        from decouple import config
+        frontend_dir = config('FRONTEND_PUBLIC_DIR', default=None)
         
-        if not os.path.exists(frontend_public):
-            raise Exception(f"Frontend public directory not found at {frontend_public}")
-            
-        return frontend_public
+        # Priority 1: Docker-mounted data directory in backend
+        data_dir = '/backend/data'
+        if os.path.exists(data_dir):
+            # Verify it's writable
+            test_file = os.path.join(data_dir, '.write_test')
+            try:
+                with open(test_file, 'w') as f:
+                    f.write('test')
+                os.remove(test_file)
+                self.stdout.write(self.style.SUCCESS(f"Using writable directory: {data_dir}"))
+                return data_dir
+            except (IOError, PermissionError) as e:
+                self.stdout.write(self.style.WARNING(f"Directory {data_dir} exists but is not writable: {e}"))
+        
+        # Priority 2: Environment variable if specified and writable
+        if frontend_dir and os.path.exists(frontend_dir):
+            test_file = os.path.join(frontend_dir, '.write_test')
+            try:
+                with open(test_file, 'w') as f:
+                    f.write('test')
+                os.remove(test_file)
+                self.stdout.write(self.style.SUCCESS(f"Using writable directory from env: {frontend_dir}"))
+                return frontend_dir
+            except (IOError, PermissionError) as e:
+                self.stdout.write(self.style.WARNING(f"Directory {frontend_dir} from env exists but is not writable: {e}"))
+                
+        # Priority 3: Frontend public directory mounted in backend
+        frontend_public = '/frontend/public'
+        if os.path.exists(frontend_public):
+            test_file = os.path.join(frontend_public, '.write_test')
+            try:
+                with open(test_file, 'w') as f:
+                    f.write('test')
+                os.remove(test_file)
+                self.stdout.write(self.style.SUCCESS(f"Using writable frontend public dir: {frontend_public}"))
+                return frontend_public
+            except (IOError, PermissionError) as e:
+                self.stdout.write(self.style.WARNING(f"Directory {frontend_public} exists but is not writable: {e}"))
+        
+        # Priority 4: Try finding a writable temp directory as last resort
+        temp_dir = tempfile.gettempdir()
+        self.stdout.write(self.style.WARNING(f"Falling back to temp directory: {temp_dir}"))
+        return temp_dir
 
     def check_remote_path_exists(self, sftp, path):
         """Check if a remote path exists on the SFTP server."""
@@ -65,14 +103,15 @@ class Command(BaseCommand):
             # Get the correct frontend/public directory path
             frontend_public_dir = self.get_frontend_public_dir()
             output_file = os.path.join(frontend_public_dir, 'merged_data.geojson')
+            self.stdout.write(self.style.SUCCESS(f"Will attempt to save to: {output_file}"))
             
             # Create temporary directory for processing
             with tempfile.TemporaryDirectory() as temp_dir:
                 # Create subdirectories in temp
                 json_dir = os.path.join(temp_dir, 'json_files')
                 shapefile_dir = os.path.join(temp_dir, 'shapefiles')
-                os.makedirs(json_dir)
-                os.makedirs(shapefile_dir)
+                os.makedirs(json_dir, exist_ok=True)
+                os.makedirs(shapefile_dir, exist_ok=True)
                 
                 # Sync data from SFTP server to temp directory
                 json_files, shapefile_dir = self.sync_data(json_dir, shapefile_dir)
@@ -165,6 +204,29 @@ class Command(BaseCommand):
     def process_and_merge_data(self, json_files, shapefile_dir, output_file):
         """Merge JSON data with shapefiles and save as GeoJSON."""
         try:
+            # First check if the output directory is writable
+            output_dir = os.path.dirname(output_file)
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir, exist_ok=True)
+                self.stdout.write(self.style.SUCCESS(f"Created directory: {output_dir}"))
+            
+            # Test if the directory is writable
+            test_file = os.path.join(output_dir, '.write_test')
+            try:
+                with open(test_file, 'w') as f:
+                    f.write('test')
+                os.remove(test_file)
+                self.stdout.write(self.style.SUCCESS(f"Directory {output_dir} is writable"))
+            except (IOError, PermissionError) as e:
+                # If not writable, switch to a temp file approach
+                self.stdout.write(self.style.WARNING(
+                    f"Output directory {output_dir} is not writable: {e}. Using temp file approach."
+                ))
+                temp_dir = tempfile.gettempdir()
+                output_file = os.path.join(temp_dir, 'merged_data.geojson')
+                self.stdout.write(self.style.WARNING(f"Changed output location to: {output_file}"))
+            
+            # Find the shapefile
             shapefile_path = next(
                 (os.path.join(shapefile_dir, f) for f in os.listdir(shapefile_dir) if f.endswith('.shp')), None
             )
@@ -175,7 +237,7 @@ class Command(BaseCommand):
             gdf = gpd.read_file(shapefile_path)
 
             if gdf.crs is None:
-                self.stdout.write("Warning: CRS missing. Setting CRS to EPSG:4326.")
+                self.stdout.write(self.style.WARNING("Warning: CRS missing. Setting CRS to EPSG:4326."))
                 gdf.set_crs('EPSG:4326', allow_override=True, inplace=True)
 
             merged_data = []
@@ -223,22 +285,45 @@ class Command(BaseCommand):
                     ))
 
             if merged_data:
+                # Create the GeoDataFrame
                 final_gdf = gpd.GeoDataFrame(merged_data, geometry='geometry')
                 final_gdf.set_crs(epsg=4326, inplace=True)
                 
                 # Add metadata about the data date
                 final_gdf.attrs['data_date'] = datetime.now().strftime('%Y-%m-%d')
                 
-                # If file exists, remove it before saving new data
-                if os.path.exists(output_file):
-                    os.remove(output_file)
-                
-                final_gdf.to_file(output_file, driver='GeoJSON')
-                self.stdout.write(self.style.SUCCESS(
-                    f"Merged GeoJSON saved at {output_file}"
-                ))
+                # Try a two-step approach if we're concerned about permissions
+                try:
+                    # If file exists, remove it before saving new data
+                    if os.path.exists(output_file):
+                        os.remove(output_file)
+                    
+                    # Try direct write
+                    final_gdf.to_file(output_file, driver='GeoJSON')
+                    self.stdout.write(self.style.SUCCESS(
+                        f"Merged GeoJSON saved at {output_file}"
+                    ))
+                    
+                    # If we redirected to a temp file, let the user know
+                    if output_file.startswith(tempfile.gettempdir()):
+                        self.stdout.write(self.style.WARNING(
+                            f"Data saved to temporary location due to permission issues. "
+                            f"Manual copy might be needed to: /usr/share/nginx/html/data/merged_data.geojson in frontend container"
+                        ))
+                    
+                except (IOError, PermissionError) as e:
+                    # If direct write fails, try with a temporary file
+                    temp_file = os.path.join(tempfile.gettempdir(), 'temp_merged_data.geojson')
+                    final_gdf.to_file(temp_file, driver='GeoJSON')
+                    self.stdout.write(self.style.SUCCESS(
+                        f"Merged GeoJSON temporarily saved at {temp_file}"
+                    ))
+                    self.stdout.write(self.style.WARNING(
+                        f"Permission error writing to {output_file}: {e}"
+                        f"Manual steps needed to copy {temp_file} to the appropriate location."
+                    ))
             else:
-                self.stdout.write("No data to merge.")
+                self.stdout.write(self.style.WARNING("No data to merge."))
 
         except Exception as e:
             self.stderr.write(self.style.ERROR(f"Error merging data: {e}"))

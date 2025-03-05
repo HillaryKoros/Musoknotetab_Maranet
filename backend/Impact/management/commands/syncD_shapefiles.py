@@ -1,7 +1,7 @@
 import os
 from io import BytesIO
 import paramiko
-from datetime import datetime
+from datetime import datetime, timedelta  # Add timedelta for yesterday's date
 import geopandas as gpd
 import pandas as pd
 from django.core.management.base import BaseCommand
@@ -65,7 +65,7 @@ class Command(BaseCommand):
             raise Exception(f"Failed to connect to SFTP server: {str(e)}")
 
     def sync_shapefiles(self):
-        """Download impact layer shapefiles from remote SFTP server."""
+        """Download impact layer shapefiles from remote SFTP server with fallback to yesterday."""
         sftp_host = config('SFTP_HOST')
         sftp_port = config('SFTP_PORT')
         sftp_username = config('SFTP_USERNAME')
@@ -73,33 +73,64 @@ class Command(BaseCommand):
         remote_folder_base = config('REMOTE_FOLDER_BASE')
         
         extensions = ['.shp', '.shx', '.dbf', '.prj']
-        remote_date = datetime.now().strftime('%Y/%m/%d/00')
-        remote_folder = f"{remote_folder_base}/{remote_date}"
+        today = datetime.now()
+        yesterday = today - timedelta(days=1)
+        date_attempts = [
+            (today.strftime('%Y/%m/%d/00'), today.strftime('%Y%m%d')),
+            (yesterday.strftime('%Y/%m/%d/00'), yesterday.strftime('%Y%m%d'))
+        ]
         
         self.stdout.write("Connecting to SFTP server...")
         sftp = self.connect_sftp(sftp_host, sftp_port, sftp_username, sftp_password)
         
         try:
-            for model, filename in self.model_configurations.items():
-                base_filename = os.path.splitext(filename)[0]
+            for model, filename_template in self.model_configurations.items():
+                base_filename_template = os.path.splitext(filename_template)[0]  # e.g., '202503050000_FPimpacts-Population'
+                downloaded = False
                 
-                for ext in extensions:
-                    remote_file = f"{base_filename}{ext}"
-                    local_path = os.path.join(self.SHAPEFILE_DIR, remote_file)
-                    remote_path = os.path.join(remote_folder, remote_file).replace('\\', '/')
+                # Try today, then yesterday if today fails
+                for remote_folder, date_str in date_attempts:
+                    if downloaded:
+                        break  # Skip further attempts if already downloaded
+                    
+                    # Update filename with the current date being tried
+                    base_filename = base_filename_template.replace(current_date, date_str)
+                    remote_folder_path = f"{remote_folder_base}/{remote_folder}"
+                    
+                    self.stdout.write(f"Trying to download files for {date_str} from {remote_folder_path}...")
                     
                     try:
-                        self.stdout.write(f"Downloading {remote_file}...")
-                        sftp.get(remote_path, local_path)
-                        self.stdout.write(self.style.SUCCESS(
-                            f"Downloaded {remote_file} to {local_path}"
-                        ))
-                    except FileNotFoundError:
+                        # Download all required extensions
+                        for ext in extensions:
+                            remote_file = f"{base_filename}{ext}"
+                            local_path = os.path.join(self.SHAPEFILE_DIR, remote_file)
+                            remote_path = os.path.join(remote_folder_path, remote_file).replace('\\', '/')
+                            
+                            self.stdout.write(f"Downloading {remote_file}...")
+                            sftp.get(remote_path, local_path)
+                            # Check if file is empty
+                            if os.path.getsize(local_path) == 0:
+                                raise Exception(f"Downloaded file {local_path} is empty")
+                            self.stdout.write(self.style.SUCCESS(
+                                f"Downloaded {remote_file} to {local_path}"
+                            ))
+                        
+                        downloaded = True
+                        # Update model_configurations with the full filename including .shp
+                        self.model_configurations[model] = f"{base_filename}.shp"
+                    
+                    except FileNotFoundError as e:
                         msg = f"Warning: {remote_file} not found at {remote_path}"
-                        if ext in ['.shp', '.shx', '.dbf']:
-                            raise Exception(msg)
-                        else:
+                        if ext in ['.shp', '.shx', '.dbf']:  # Critical files
                             self.stdout.write(self.style.WARNING(msg))
+                            if date_str == yesterday.strftime('%Y%m%d'):  # Last attempt failed
+                                raise Exception(f"Failed to find critical files for {model.__name__} even in yesterday's data")
+                        else:  # Optional files like .prj
+                            self.stdout.write(self.style.WARNING(msg))
+                            downloaded = True  # Consider it downloaded if only .prj is missing
+                    except Exception as e:
+                        raise Exception(f"Error downloading {remote_file}: {str(e)}")
+        
         finally:
             sftp.close()
 
@@ -107,6 +138,10 @@ class Command(BaseCommand):
         """Load impact layer shapefiles into the database."""
         for model, filename in self.model_configurations.items():
             file_path = os.path.join(self.SHAPEFILE_DIR, filename)
+            
+            # Ensure the file exists
+            if not os.path.exists(file_path):
+                raise Exception(f"Shapefile not found at {file_path}")
             
             self.stdout.write(f"Loading data for {model.__name__} from {file_path}...")
             
@@ -129,9 +164,11 @@ class Command(BaseCommand):
                 ))
             
             except Exception as e:
+                self.stdout.write(self.style.ERROR(f"Full error: {str(e)}"))
                 raise Exception(
                     f"Error loading data for {model.__name__}: {str(e)}"
                 )
+                
     
     def cleanup_temp_files(self):
         """Clean up temporary files after processing."""

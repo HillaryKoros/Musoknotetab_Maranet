@@ -74,3 +74,4 @@ urllib3==2.3.0
 wagtail==6.3.2
 whitenoise==6.8.2
 Willow==1.9.0
+

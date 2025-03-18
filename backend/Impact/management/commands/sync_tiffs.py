@@ -42,7 +42,7 @@ class Command(BaseCommand):
         self.merged_alerts_file = os.path.join(self.temp_dir, 'merged_alerts.tif')
         
         # GeoServer configuration with URL switching
-        self.primary_geoserver_url =  'http://flood_watch_geoserver:8080/geoserver'
+        self.primary_geoserver_url =  'http://127.0.0.1:8093/geoserver'
         self.fallback_geoserver_url = 'http://10.10.1.13:8093/geoserver'
         self.geoserver_url = self.primary_geoserver_url  # Start with primary URL
         self.geoserver_username = config('GEOSERVER_USERNAME', default='admin')

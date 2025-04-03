@@ -1,41 +1,54 @@
 import React from 'react';
-import { Container, Row, Col, Card, Button } from 'react-bootstrap';
+import { Container, Row, Col, Carousel } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 
 const Home = () => {
-  const features = [
-    { title: 'Interactive Map Viewer', description: 'Explore flood related data layers with interactive map interface', link: '/map', icon: '🗺️' },
-    { title: 'Advanced Analysis', description: 'Perform analysis of flood and demographic data', link: '/analysis', icon: '📈' },
+  const carouselImages = [
+    {
+      src: '/assets/flood-aerial.jpg',
+      title: 'Real-time Flood Monitoring',
+      desc: 'Advanced monitoring systems across East Africa'
+    },
+    {
+      src: '/assets/flood-banner.jpg',
+      title: 'Early Warning Systems',
+      desc: 'Timely alerts for flood risk areas'
+    },
+    {
+      src: '/assets/flood-rescue.jpg',
+      title: 'Community Resilience',
+      desc: 'Building stronger flood-resistant communities'
+    },
+    {
+      src: '/assets/calibration-map.jpg',
+      title: 'Data-Driven Insights',
+      desc: 'Comprehensive flood analysis and prediction'
+    }
   ];
 
   return (
-    <Container className="py-4">
-      <Row className="mb-3">
-        <Col>
-          <h2 className="text-center mb-2">EAFW</h2>
-          <p className="text-center">
-            Explore, analyze, and visualize flood related data for East Africa
-          </p>
-        </Col>
-      </Row>
-
-      <Row>
-        {features.map((feature, index) => (
-          <Col key={index} md={4} className="mb-3">
-            <Card className="h-100">
-              <Card.Body className="text-center p-3">
-                <div className="h4 mb-2">{feature.icon}</div>
-                <Card.Title className="h5">{feature.title}</Card.Title>
-                <Card.Text className="small">{feature.description}</Card.Text>
-                <Button as={Link} to={feature.link} variant="primary" size="sm">
-                  Explore
-                </Button>
-              </Card.Body>
-            </Card>
-          </Col>
+    <div className="home-page">
+      <Carousel fade className="hero-carousel" interval={5000}>
+        {carouselImages.map((image, index) => (
+          <Carousel.Item key={index}>
+            <div 
+              className="carousel-image"
+              style={{ backgroundImage: `url(${image.src})` }}
+            >
+              <Container>
+                <Row className="align-items-center min-vh-100">
+                  <Col md={8} className="text-white">
+                    <h1 className="display-4 fw-bold mb-4 animate-text">{image.title}</h1>
+                    <p className="lead mb-4 animate-text-delay">{image.desc}</p>
+                    <Link to="/map" className="btn btn-light btn-lg animate-button">Explore Map</Link>
+                  </Col>
+                </Row>
+              </Container>
+            </div>
+          </Carousel.Item>
         ))}
-      </Row>
-    </Container>
+      </Carousel>
+    </div>
   );
 };
 

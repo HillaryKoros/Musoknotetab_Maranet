@@ -1,18 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts';
 
 // Component to render a discharge forecast chart
-export const DischargeChart = ({ timeSeriesData }) => {
+export const DischargeChart = ({ timeSeriesData, selectedSeries = 'both', onSeriesChange }) => {
   if (!timeSeriesData || timeSeriesData.length === 0) return <div className="chart-no-data">No data available.</div>;
 
   const processedData = timeSeriesData.map(item => ({
     time: new Date(item.time),
-    gfs: Number(item.gfs),
-    icon: Number(item.icon),
-  })).filter(item => !isNaN(item.gfs) && !isNaN(item.icon));
+    gfs: selectedSeries === 'icon' ? null : Math.max(Number(item.gfs), 1),
+    icon: selectedSeries === 'gfs' ? null : Math.max(Number(item.icon), 1)
+  })).filter(item => 
+    (selectedSeries === 'both' && (!isNaN(item.gfs) || !isNaN(item.icon))) ||
+    (selectedSeries === 'gfs' && !isNaN(item.gfs)) ||
+    (selectedSeries === 'icon' && !isNaN(item.icon))
+  );
 
   return (
     <div className="chart-container">
+      
       <ResponsiveContainer>
         <LineChart data={processedData} margin={{ top: 20, right: 30, left: 70, bottom: 80 }}>
           <CartesianGrid strokeDasharray="3 3" />
@@ -23,14 +28,18 @@ export const DischargeChart = ({ timeSeriesData }) => {
               angle: -90, 
               position: 'insideLeft', 
               offset: -10, 
-              dy: 60, // Move the label downward to align with the x-axis
+              dy: 60, 
               style: { fontSize: '12px', fontWeight: 'bold' } 
             }} 
           />
           <Tooltip labelFormatter={(label) => `Date: ${label.toLocaleDateString('en-GB')}`} formatter={(value, name) => [Number(value).toFixed(1), name]} />
           <RechartsLegend />
-          <Line type="monotone" dataKey="gfs" stroke="#1f77b4" name="GFS Forecast" dot={false} strokeWidth={2} />
-          <Line type="monotone" dataKey="icon" stroke="#ff7f0e" name="ICON Forecast" dot={false} strokeWidth={2} />
+          {(selectedSeries === 'both' || selectedSeries === 'gfs') && 
+            <Line type="monotone" dataKey="gfs" stroke="#1f77b4" name="GFS Forecast" dot={false} strokeWidth={2} />
+          }
+          {(selectedSeries === 'both' || selectedSeries === 'icon') && 
+            <Line type="monotone" dataKey="icon" stroke="#ff7f0e" name="ICON Forecast" dot={false} strokeWidth={2} />
+          }
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -57,10 +66,10 @@ export const GeoSFMChart = ({ timeSeriesData, dataType = 'riverdepth' }) => {
               angle: -90, 
               position: 'insideLeft', 
               offset: -30, 
-              dy: 60, // Move the label downward to align with the x-axis
+              dy: 60, 
               style: { fontSize: '12px', fontWeight: 'bold' } 
             }} 
-            tickFormatter={(value) => Number(value).toFixed(2)} 
+            tickFormatter={(value) => Number(value).toFixed(0)} 
           />
           <Tooltip labelFormatter={(label) => `Date: ${new Date(label).toLocaleDateString('en-GB')}`} formatter={(value) => [`${Number(value).toFixed(2)} ${displayUnit}`, tooltipLabel]} />
           <RechartsLegend />

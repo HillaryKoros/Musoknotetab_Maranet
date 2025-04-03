@@ -9,22 +9,63 @@
 .navbar-custom {
   background-color: #115803;
   border-bottom: 2px solid #228B22;
-  padding: 0 20px;
+  padding: 0.5rem;
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 1000;
-  height: 80px;
+  min-height: 60px;
+  height: auto;
 }
 
 .navbar-logo {
-  height: 80px;
+  height: 50px;
   width: auto;
+  max-width: 100%;
+  transition: height 0.3s ease;
 }
 
 .brand-container {
-  margin-right: 20px;
+  margin-right: 15px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.brand-logo {
+  height: 40px;
+  width: auto;
+  max-width: 100%;
+  transition: height 0.3s ease;
+}
+
+@media (max-width: 768px) {
+  .navbar-logo {
+    height: 40px;
+  }
+
+  .brand-logo {
+    max-height: 35px;
+  }
+
+  .brand-container {
+    margin-right: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar-logo {
+    height: 35px;
+  }
+
+  .brand-logo {
+    max-height: 30px;
+  }
+
+  .brand-container {
+    margin-right: 5px;
+  }
 }
 
 .flood-watch {
@@ -220,7 +261,6 @@
   transform: rotate(-90deg);
   transform-origin: right top;
   white-space: nowrap;
-  transition: all 0.3s ease;
 }
 
 /* Chart Components */
@@ -468,46 +508,116 @@ input:checked + .toggle-slider-small:before {
   .nav-link {
     padding: 6px 10px !important;
   }
-  
+
   .navbar-custom .navbar-nav {
     margin-left: 0; /* Reset margin for smaller screens */
   }
 }
 
 @media (max-width: 768px) {
-  .sidebar, .sidebar-tabs {
+  .sidebar {
     width: 100%;
-    position: relative;
-    top: 0;
+    max-width: 100%;
     height: auto;
+    position: fixed;
+    top: 60px;
+    left: -100%;
+    transition: left 0.3s ease;
+    z-index: 999;
+  }
+
+  .sidebar.active {
+    left: 0;
   }
 
   .map-container {
     left: 0;
-    top: auto;
+    width: 100%;
+    height: calc(100vh - 90px);
+    position: fixed;
+  }
+
+  .toggle-sidebar-btn {
+    display: block;
+    position: fixed;
+    top: 90px;
+    left: 10px;
+    z-index: 1000;
+    background: #115803;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .sidebar-tabs {
+    width: 100%;
     position: relative;
-    height: calc(100vh - 400px);
+    top: 0;
   }
 
   .bottom-panel {
     left: 0;
+    height: 300px;
   }
 
   .tab-link {
     width: 50%;
+    padding: 10px !important;
+    font-size: 0.9rem;
   }
 
   .station-info-overlay {
-    max-width: calc(100% - 40px);
+    max-width: calc(100% - 20px);
+    font-size: 0.9rem;
+  }
+
+  .navbar-custom {
+    padding: 0.25rem;
   }
 
   .navbar-custom .navbar-nav {
-    gap: 0.5rem !important;
+    gap: 0.25rem !important;
     margin-left: 0;
+    padding: 0.5rem 0;
+  }
+
+  .navbar-logo {
+    height: 40px;
+  }
+
+  .brand-logo {
+    height: 30px;
   }
 
   .brand-container {
-    margin-right: 10px;
+    margin-right: 5px;
+  }
+
+  .nav-link {
+    font-size: 0.8rem !important;
+    padding: 6px 8px !important;
+  }
+
+  .navbar-collapse {
+    background-color: #115803;
+    padding: 0.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar-logo {
+    height: 35px;
+  }
+
+  .brand-logo {
+    height: 25px;
+  }
+
+  .nav-link {
+    font-size: 0.75rem !important;
+    padding: 4px 6px !important;
   }
 }
 
@@ -528,65 +638,163 @@ input:checked + .toggle-slider-small:before {
   border-bottom: none;
 }
 
-.brand-logo {
-  height: auto;
-  max-height: 70px; /* Adjust based on your design needs */
-  width: auto;
+
+
+/* Analysis styles */
+.stat-card {
+  transition: transform 0.2s;
+  border-left: 4px solid;
 }
-/* MapViewer Specific Styles */
-.layer-control-panel {
+
+.stat-card:hover {
+  transform: translateY(-3px);
+}
+
+.risk-indicator {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.analysis-container {
+}
+
+/* Home Page Styles */
+.hero-carousel {
+  height: calc(100vh - 80px);
+  width: 100vw;
+  position: relative;
+  overflow: hidden;
+  margin-top: -15px;
+}
+
+.carousel-image {
+  height:100vh;
+  width: 100vw;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.carousel-image::before {
+  content: '';
   position: absolute;
   top: 0;
-  right: -200px; /* Hidden by default */
-  width: 200px;
-  height: 100%;
-  background: white;
-  border-left: 2px solid #ccc;
-  z-index: 1001;
-  transition: right 0.3s ease;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6));
+  z-index: 1;
 }
 
-.layer-control-panel.visible {
-  right: 0; /* Slide in when visible */
+.carousel-image .container {
+  position: relative;
+  z-index: 1;
 }
 
-.layer-control-close-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  padding: 5px 10px;
-  background: #ff4444;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 12px;
+.animate-text {
+  animation: fadeInUp 1s ease-out;
 }
 
-.layer-control-close-btn:hover {
-  background: #cc0000;
+.animate-text-delay {
+  animation: fadeInUp 1s ease-out 0.3s;
+  animation-fill-mode: both;
 }
 
-.toggle-label {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 1002;
-  background: #2ecc71;
-  color: white;
-  padding: 5px 15px;
-  border-radius: 5px;
-  font-weight: bold;
-  font-size: 14px;
-  cursor: pointer;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-  transform: rotate(-90deg);
-  transform-origin: right top;
-  white-space: nowrap;
+.animate-button {
+  animation: fadeInUp 1s ease-out 0.6s;
+  animation-fill-mode: both;
 }
 
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
+.carousel-control-prev,
+.carousel-control-next {
+  width: 5%;
+}
 
+.carousel-indicators {
+  margin-bottom: 2rem;
+}
 
+.home-page .partner-logo {
+  max-height: 80px;
+  width: auto;
+  filter: grayscale(100%);
+  transition: filter 0.3s ease;
+}
 
+.home-page .partner-logo:hover {
+  filter: grayscale(0%);
+}
 
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .home-page .hero-section {
+    text-align: center;
+    padding: 60px 0;
+  }
+
+  .home-page .partner-logo {
+    max-height: 60px;
+    margin: 10px 0;
+  }
+}
+
+@media (max-width: 576px) {
+  .home-page h1 {
+    font-size: 2.5rem;
+  }
+
+  .home-page .lead {
+    font-size: 1.1rem;
+  }
+}
+
+.partners-section {
+  padding: 1rem 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.partners-section .container {
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+.partners-section h2 {
+  margin-bottom: 1rem;
+}
+
+.partners-section .partner-logo {
+  max-height: 60px;
+  width: auto;
+  object-fit: contain;
+}
+
+@media (max-width: 768px) {
+  .partners-section {
+    min-height: calc(100vh - 90px);
+    padding: 1rem 0;
+  }
+
+  .partners-section .partner-logo {
+    max-height: 45px;
+  }
+}

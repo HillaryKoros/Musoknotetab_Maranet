@@ -162,7 +162,7 @@ class SectorData(models.Model):
     cat = models.FloatField(null=True)
     # id = models.BigIntegerField(primary_key=True)
     geom = models.PointField()
-
+    
     def __unicode__(self):
         return self.sec_name
 
@@ -236,3 +236,33 @@ class RiverSection(models.Model):
     class Meta:
         verbose_name_plural = "RiverSections"
     
+
+
+# 11. Create a model named GhaAdmin1 that has the following fields:
+
+class Admin1(models.Model):
+    objectid = models.BigIntegerField()
+    country = models.CharField(max_length=254)
+    area = models.FloatField()
+    shape_leng = models.FloatField()
+    shape_area = models.FloatField()
+    land_under = models.CharField(max_length=254,null=True,blank=True)
+    geom = models.MultiPolygonField(srid=4326)
+
+    def __str__(self):
+        return self.country  
+
+class WaterBodies(models.Model):
+    af_wtr_id = models.BigIntegerField()
+    sqkm = models.FloatField()
+    name_of_wa = models.CharField(max_length=254, blank=True, null=True)
+    type_of_wa = models.CharField(max_length=254, blank=True, null=True)
+    shape_area = models.FloatField()
+    shape_len = models.FloatField()
+    geom = models.MultiPolygonField(srid=4326)
+
+    def __unicode__(self):
+        return self.name_of_wa or "Unnamed Water Body"
+
+    class Meta:
+        verbose_name_plural = "WaterBodies"

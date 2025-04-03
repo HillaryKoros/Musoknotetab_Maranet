@@ -47,9 +47,8 @@ pandas==2.2.3
 paramiko==3.5.0
 pillow==11.1.0
 pillow_heif==0.21.0
-psycopg==3.2.3
-psycopg2==2.9
-psycopg2-binary==2.9
+psycopg==3.2.4
+psycopg-binary==3.2.3
 pycparser==2.22
 PyNaCl==1.5.0
 pyogrio==0.10.0
@@ -75,3 +74,7 @@ urllib3==2.3.0
 wagtail==6.3.2
 whitenoise==6.8.2
 Willow==1.9.0
+
+celery>=5.3.6
+django-celery-beat>=2.6.0
+redis>=5.0.1 

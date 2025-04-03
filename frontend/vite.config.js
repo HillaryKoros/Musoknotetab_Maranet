@@ -3,37 +3,61 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  
+
   // Build configuration
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        assetFileNames: (assetInfo) => {
+          const extType = assetInfo.name.split('.').at(1);
+          if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(extType)) {
+            return `assets/images/[name][extname]`;
+          }
+          return `assets/[name]-[hash][extname]`;
+        },
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        entryFileNames: 'assets/js/[name]-[hash].js',
+      },
+    },
   },
-  
-  // Server and proxy configuration
+
+
+
+  // Server configuration
   server: {
+    // LOCAL: use '127.0.0.1'
+    // STAGING: use '0.0.0.0'
+    host: '127.0.0.1',
+    port: 8094,
     proxy: {
-      // // Geoserver proxy
-      // '/geoserver': {
-      //   target: 'http://localhost:8080',
-      //   changeOrigin: true,
-      //   secure: false,
-      // },
-      // // Django backend proxy
-      // '/api': {
-      //   target: 'http://localhost:8000',
-      //   changeOrigin: true,
-      //   secure: false,
-      // },
-      // '/admin': {
-      //   target: 'http://localhost:8000',
-      //   changeOrigin: true,
-      //   secure: false,
-      // }
+      '/api': {
+        // LOCAL: use 'http://127.0.0.1:8090'
+        // STAGING: use 'http://10.10.1.13:8090'
+        target: 'http://127.0.0.1:8090',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/geoserver': {
+        // LOCAL: use 'http://127.0.0.1:8093'
+        // STAGING: use 'http://10.10.1.13:8093'
+        target: 'http://127.0.0.1:8093',
+        changeOrigin: true,
+        secure: false,
+      }
     }
   },
-  
-  // Base public path when served in production
+
+  // Base public path
   base: '/',
+  
+  // Resolve aliases
+  resolve: {
+    alias: {
+      '@': '/src',
+      '@assets': '/src/assets'
+    }
+  }
 })

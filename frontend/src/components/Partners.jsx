@@ -1,5 +1,9 @@
 import React from 'react';
 import { Container, Row, Col, Card } from 'react-bootstrap';
+import icpacLogo from '@assets/icpac.jpg';
+import cimaLogo from '@assets/cima_research_foundation_logo.jpg';
+import undrrLogo from '@assets/banner-logo-undrr.png';
+
 
 const Partners = () => {
   const partners = [
@@ -7,19 +11,19 @@ const Partners = () => {
       name: "ICPAC",
       description: "IGAD Climate Prediction and Applications Centre",
       role: "Regional Climate Centre for Eastern Africa and Host Flood Watch System",
-      logo: '/src/assets/icpac.jpg'
+      logo: icpacLogo
     },
     {
       name: "CIMA Research Foundation",
       description: "Research and Collaboration Partner",
       role: "Implementing FloodPROOFS East Africa (FPEA) Forecasting Chain",
-      logo: '/src/assets/cima_research_foundation_logo.jpg'
+      logo: cimaLogo
     },
     {
       name: "UNDRR",
       description: "United Nations Office for Disaster Risk Reduction",
       role: "Program Implementation and Early Warning Systems",
-      logo: '/src/assets/banner-logo-undrr.png'
+      logo: undrrLogo
     }
   ];
 

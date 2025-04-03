@@ -1,34 +1,99 @@
 import os
 import json
-from datetime import datetime
+import shutil
+from datetime import datetime, timedelta
 import paramiko
 import geopandas as gpd
 from django.core.management.base import BaseCommand
 from decouple import config
+import tempfile
 
 class Command(BaseCommand):
     help = 'Download and process remote JSON and shapefile data from an SFTP server.'
 
-    BASE_DIR = './temp_data'  # Temporary local directory
-    OUTPUT_GEOJSON = 'merged_data.geojson'  # Name of the output file
+    def get_data_path(self, base_date=None):
+        if base_date is None:
+            base_date = datetime.now()
+        year = str(base_date.year)
+        month = str(base_date.month).zfill(2)
+        day = str(base_date.day).zfill(2)
+        
+        json_remote_dir = config('JSON_REMOTE_DIR').rstrip('/')
+        
+        base_path = f"{json_remote_dir}/{year}/{month}/{day}"
+        full_path = f"{base_path}/00"
+        
+        return base_path, full_path, base_date
+
+    def get_frontend_public_dir(self):
+        """Get the frontend/public directory at the project root."""
+        # Get the directory of manage.py (backend/), then go up one level and into frontend/public
+        manage_py_dir = os.path.dirname(os.path.abspath(__file__))  # backend/Impact/management/commands/
+        project_root = os.path.abspath(os.path.join(manage_py_dir, '../../../../'))  # /home/.../flood_watch_system/
+        frontend_public = os.path.join(project_root, 'frontend', 'public')
+        
+        # Verify the directory exists
+        if not os.path.exists(frontend_public):
+            raise Exception(f"Directory {frontend_public} does not exist. Expected it at project root based on structure.")
+        
+        # Verify it's writable
+        test_file = os.path.join(frontend_public, '.write_test')
+        try:
+            with open(test_file, 'w') as f:
+                f.write('test')
+            os.remove(test_file)
+            self.stdout.write(self.style.SUCCESS(f"Using writable directory: {frontend_public}"))
+            return frontend_public
+        except (IOError, PermissionError) as e:
+            raise Exception(f"Directory {frontend_public} is not writable: {e}. Check permissions or run with sufficient privileges.")
+
+    def check_remote_path_exists(self, sftp, path):
+        """Check if a remote path exists on the SFTP server."""
+        try:
+            sftp.stat(path)
+            return True
+        except IOError:
+            return False
+
+    def get_valid_json_path(self, sftp, max_retries=7):
+        """
+        Get the most recent valid JSON path, falling back to previous days if needed.
+        Returns tuple of (path, date) or (None, None) if no valid path found.
+        """
+        current_date = datetime.now()
+        
+        for i in range(max_retries):
+            try_date = current_date - timedelta(days=i)
+            _, full_path, _ = self.get_data_path(try_date)
+            
+            if self.check_remote_path_exists(sftp, full_path):
+                return full_path, try_date
+                
+        return None, None
 
     def handle(self, *args, **kwargs):
         try:
-            # Ensure local directories exist
-            os.makedirs(self.BASE_DIR, exist_ok=True)
+            # Get the frontend/public directory path
+            frontend_public_dir = self.get_frontend_public_dir()
+            output_file = os.path.join(frontend_public_dir, 'merged_data.geojson')
+            self.stdout.write(self.style.SUCCESS(f"Will save directly to: {output_file}"))
             
-            # Sync data from SFTP server
-            json_files, shapefile_dir = self.sync_data()
-            
-            # Process and merge data
-            self.process_and_merge_data(json_files, shapefile_dir)
+            # Create temporary directory for processing intermediate files
+            with tempfile.TemporaryDirectory() as temp_dir:
+                json_dir = os.path.join(temp_dir, 'json_files')
+                shapefile_dir = os.path.join(temp_dir, 'shapefiles')
+                os.makedirs(json_dir, exist_ok=True)
+                os.makedirs(shapefile_dir, exist_ok=True)
+                
+                # Sync data from SFTP server to temp directory
+                json_files, shapefile_dir = self.sync_data(json_dir, shapefile_dir)
+                
+                # Process and merge data, saving directly to frontend/public/
+                self.process_and_merge_data(json_files, shapefile_dir, output_file)
 
         except Exception as e:
             self.stderr.write(self.style.ERROR(f"Error: {e}"))
             raise
-        finally:
-            # Only clean up temporary files, not the final output
-            self.cleanup_temp_files(exclude=[self.OUTPUT_GEOJSON])
 
     def connect_sftp(self):
         """Establish an SFTP connection."""
@@ -44,36 +109,44 @@ class Command(BaseCommand):
         except Exception as e:
             raise Exception(f"Failed to connect to SFTP server: {e}")
 
-    def sync_data(self):
+    def sync_data(self, json_dir, shapefile_dir):
         """Download JSON and shapefile data from remote SFTP server."""
         sftp = self.connect_sftp()
 
-        json_remote_dir = config('JSON_REMOTE_DIR')
-        shapefile_remote_dir = config('SHAPEFILE_REMOTE_DIR')
-        json_local_dir = os.path.join(self.BASE_DIR, 'json_files')
-        shapefile_local_dir = os.path.join(self.BASE_DIR, 'shapefiles')
-
-        os.makedirs(json_local_dir, exist_ok=True)
-        os.makedirs(shapefile_local_dir, exist_ok=True)
-
         try:
+            # Get valid JSON path with fallback
+            json_path, data_date = self.get_valid_json_path(sftp)
+            if not json_path:
+                raise Exception("No valid JSON data found for the last 7 days")
+
+            self.stdout.write(f"Using JSON data from: {data_date.strftime('%Y-%m-%d')}")
+
+            # Get static shapefile directory
+            shapefile_remote_dir = config('SHAPEFILE_REMOTE_DIR')
+            if not self.check_remote_path_exists(sftp, shapefile_remote_dir):
+                raise Exception(f"Shapefile directory not found: {shapefile_remote_dir}")
+
             # Download JSON files
             self.stdout.write("Downloading JSON files...")
-            json_files = self.download_files(sftp, json_remote_dir, json_local_dir, '.json')
+            json_files = self.download_files(sftp, json_path, json_dir, '.json')
 
             # Download shapefiles
             self.stdout.write("Downloading shapefiles...")
             shapefile_extensions = ['.shp', '.shx', '.dbf', '.prj']
-            self.download_files(sftp, shapefile_remote_dir, shapefile_local_dir, extensions=shapefile_extensions)
+            self.download_files(sftp, shapefile_remote_dir, shapefile_dir, extensions=shapefile_extensions)
 
-            return json_files, shapefile_local_dir
+            return json_files, shapefile_dir
 
         finally:
             sftp.close()
 
     def download_files(self, sftp, remote_dir, local_dir, extensions):
         """Download files with specified extensions from a remote directory."""
-        remote_files = sftp.listdir(remote_dir)
+        try:
+            remote_files = sftp.listdir(remote_dir)
+        except IOError as e:
+            raise Exception(f"Error accessing remote directory {remote_dir}: {e}")
+
         downloaded_files = []
 
         for file in remote_files:
@@ -92,12 +165,33 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.SUCCESS(f"Downloaded {file}"))
                 except FileNotFoundError:
                     self.stderr.write(self.style.WARNING(f"File not found: {remote_path}"))
+                except Exception as e:
+                    self.stderr.write(self.style.WARNING(f"Error downloading {file}: {e}"))
+
+        if not downloaded_files:
+            raise Exception(f"No files with extensions {extensions} found in {remote_dir}")
 
         return downloaded_files
 
-    def process_and_merge_data(self, json_files, shapefile_dir):
-        """Merge JSON data with shapefiles and save as GeoJSON."""
+    def process_and_merge_data(self, json_files, shapefile_dir, output_file):
+        """Merge JSON data with shapefiles and save directly as GeoJSON to frontend/public."""
         try:
+            # Ensure the output directory exists and is writable
+            output_dir = os.path.dirname(output_file)
+            if not os.path.exists(output_dir):
+                raise Exception(f"Output directory {output_dir} does not exist. Expected it at project root.")
+            
+            # Test if the directory is writable
+            test_file = os.path.join(output_dir, '.write_test')
+            try:
+                with open(test_file, 'w') as f:
+                    f.write('test')
+                os.remove(test_file)
+                self.stdout.write(self.style.SUCCESS(f"Directory {output_dir} is writable"))
+            except (IOError, PermissionError) as e:
+                raise Exception(f"Cannot write to {output_dir}: {e}. Ensure frontend/public permissions are correct.")
+
+            # Find the shapefile
             shapefile_path = next(
                 (os.path.join(shapefile_dir, f) for f in os.listdir(shapefile_dir) if f.endswith('.shp')), None
             )
@@ -108,7 +202,7 @@ class Command(BaseCommand):
             gdf = gpd.read_file(shapefile_path)
 
             if gdf.crs is None:
-                self.stdout.write("Warning: CRS missing. Setting CRS to EPSG:4326.")
+                self.stdout.write(self.style.WARNING("Warning: CRS missing. Setting CRS to EPSG:4326."))
                 gdf.set_crs('EPSG:4326', allow_override=True, inplace=True)
 
             merged_data = []
@@ -116,14 +210,12 @@ class Command(BaseCommand):
             for json_file in json_files:
                 try:
                     with open(json_file, 'r') as file:
-                        # Safely parse JSON and ensure it's a list or dict
                         data = json.load(file)
                         if isinstance(data, str):
-                            data = json.loads(data)  # Handle double-encoded JSON
+                            data = json.loads(data)
                         if not isinstance(data, (list, dict)):
                             raise ValueError(f"Invalid JSON format in {json_file}")
                         
-                        # Convert single dict to list for consistent processing
                         if isinstance(data, dict):
                             data = [data]
 
@@ -158,40 +250,22 @@ class Command(BaseCommand):
                     ))
 
             if merged_data:
+                # Create the GeoDataFrame
                 final_gdf = gpd.GeoDataFrame(merged_data, geometry='geometry')
-                # Set CRS before saving
                 final_gdf.set_crs(epsg=4326, inplace=True)
-                output_geojson = os.path.join(self.BASE_DIR, self.OUTPUT_GEOJSON)
-                # Save without passing CRS parameter
-                final_gdf.to_file(output_geojson, driver='GeoJSON')
-                self.stdout.write(self.style.SUCCESS(
-                    f"Merged GeoJSON saved at {output_geojson}"
-                ))
+                
+                # Add metadata about the data date
+                final_gdf.attrs['data_date'] = datetime.now().strftime('%Y-%m-%d')
+                
+                # Save directly to the specified output file
+                if os.path.exists(output_file):
+                    os.remove(output_file)
+                
+                final_gdf.to_file(output_file, driver='GeoJSON')
+                self.stdout.write(self.style.SUCCESS(f"Merged GeoJSON saved directly at {output_file}"))
             else:
-                self.stdout.write("No data to merge.")
+                self.stdout.write(self.style.WARNING("No data to merge."))
 
         except Exception as e:
             self.stderr.write(self.style.ERROR(f"Error merging data: {e}"))
             raise
-
-    def cleanup_temp_files(self, exclude=None):
-        """Clean up temporary files except for specified files."""
-        self.stdout.write("Cleaning up temporary files...")
-        exclude = exclude or []
-        exclude_paths = [os.path.join(self.BASE_DIR, file) for file in exclude]
-        
-        for root, dirs, files in os.walk(self.BASE_DIR, topdown=False):
-            for file in files:
-                file_path = os.path.join(root, file)
-                if file_path not in exclude_paths:
-                    try:
-                        os.remove(file_path)
-                    except Exception as e:
-                        self.stderr.write(self.style.WARNING(f"Error removing file {file}: {e}"))
-            
-            # Only remove directory if it's empty and not the BASE_DIR
-            if not os.listdir(root) and root != self.BASE_DIR:
-                try:
-                    os.rmdir(root)
-                except Exception as e:
-                    self.stderr.write(self.style.WARNING(f"Error removing directory {root}: {e}"))

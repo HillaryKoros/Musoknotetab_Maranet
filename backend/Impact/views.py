@@ -74,3 +74,5 @@ class WaterbodiesViewSet(viewsets.ReadOnlyModelViewSet):
     schema = AutoSchema()
     queryset = WaterBodies.objects.all()
     serializer_class = WaterBodiesSerializer
+
+

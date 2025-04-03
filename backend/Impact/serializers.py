@@ -3,7 +3,6 @@ from rest_framework import viewsets,serializers
 
 from .models import AffectedPopulation, ImpactedGDP, AffectedCrops, AffectedRoads, DisplacedPopulation, AffectedLivestock, AffectedGrazingLand, SectorData,SectorForecast,WaterBodies
 
-
 class AffectedPopulationSerializer(GeoFeatureModelSerializer):
     class Meta:
         model = AffectedPopulation
@@ -71,3 +70,4 @@ class WaterBodiesSerializer(GeoFeatureModelSerializer):
         model = WaterBodies
         geo_field = 'geom'
         fields = '__all__'
+

@@ -1,15 +1,20 @@
+// Import necessary dependencies
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, NavLink } from 'react-router-dom';
 import { Navbar, Container, Nav } from 'react-bootstrap';
+
+// Import component pages
 import Home from './components/Home';
 import MapViewer from './components/MapViewer';
-import Reports from './components/Reports';
 import Analysis from './components/Analysis';
 import Indicators from './components/Indicators';
 import About from './components/About';
 import Partners from './components/Partners';
 import Contact from './components/Contact';
 
+// Import assets and styles
+import leftLogo from '@assets/ICPAC_Website_Header_Logo.svg';
+import floodWatchLogo from '@assets/flood-watch-banner-transparent.png'; // Import the PNG logo
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
 
@@ -17,98 +22,71 @@ const App = () => {
   return (
     <Router>
       <div className="app-wrapper">
+        {/* Navigation Bar */}
         <Navbar 
           className="navbar-custom" 
-          expand="lg" 
-          style={{ 
-            backgroundColor: '#1B5E20',
-            padding: '0.5rem 1rem',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}
+          expand="lg"
         >
           <Container fluid>
-            {/* Left Logo */}
-            <div className="d-flex align-items-center">
+            {/* Brand Logo Section (not a link) */}
+            <div className="brand-container">
               <img
-                src="src/assets/ICPAC_Website_Header_Logo.svg"
-                alt="Left Logo"
-                className="navbar-logo me-3"
-                style={{ height: '100px' }}
+                src={floodWatchLogo}
+                alt="East Africa Flood Watch"
+                className="brand-logo"
               />
-              <div className="brand-container">
-                <div className="brand-text">
-                  <span className="text-uppercase" style={{ fontSize: '0.9rem', color: '#fff' }}>
-                    East Africa
-                  </span>
-                  <div className="flood-watch">
-                    <span style={{ color: '#FFC107', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                      FLOOD
-                    </span>
-                    <span style={{ color: '#fff', fontWeight: 'bold', fontSize: '1.2rem', marginLeft: '8px' }}>
-                      WATCH
-                    </span>
-                  </div>
-                </div>
-              </div>
             </div>
 
+            {/* Mobile Navigation Toggle Button */}
             <Navbar.Toggle aria-controls="basic-navbar-nav" />
             
+            {/* Navigation Links */}
             <Navbar.Collapse id="basic-navbar-nav">
-              <Nav className="mx-auto" style={{ gap: '1.5rem' }}>
-                <Nav.Link as={NavLink} to="/" className="nav-link" style={{ color: '#fff' }}>
+              <Nav className="mx-auto">
+                <Nav.Link as={NavLink} to="/" className="nav-link">
                   HOME
                 </Nav.Link>
                 <Nav.Link 
                   as={NavLink} 
                   to="/map" 
-                  className="nav-link" 
-                  style={{ 
-                    color: '#FFC107',
-                    backgroundColor: '#2E7D32',
-                    padding: '0.5rem 1rem',
-                    borderRadius: '4px'
-                  }}
+                  className="nav-link fw-bold" 
                 >
                   MAPVIEWER
                 </Nav.Link>
-                <Nav.Link as={NavLink} to="/reports" className="nav-link" style={{ color: '#fff' }}>
-                  REPORTS
-                </Nav.Link>
-                <Nav.Link as={NavLink} to="/analysis" className="nav-link" style={{ color: '#fff' }}>
+                <Nav.Link as={NavLink} to="/analysis" className="nav-link">
                   ANALYSIS
                 </Nav.Link>
-                <Nav.Link as={NavLink} to="/indicators" className="nav-link" style={{ color: '#fff' }}>
+                <Nav.Link as={NavLink} to="/indicators" className="nav-link">
                   FLOOD INDICATORS
                 </Nav.Link>
-                <Nav.Link as={NavLink} to="/about" className="nav-link" style={{ color: '#fff' }}>
-                  ABOUT
+                <Nav.Link as={NavLink} to="/about" className="nav-link">
+                  ABOUT  
                 </Nav.Link>
-                <Nav.Link as={NavLink} to="/partners" className="nav-link" style={{ color: '#fff' }}>
+                <Nav.Link as={NavLink} to="/partners" className="nav-link">
                   PARTNERS
                 </Nav.Link>
-                <Nav.Link as={NavLink} to="/contact" className="nav-link" style={{ color: '#fff' }}>
+                <Nav.Link as={NavLink} to="/contact" className="nav-link">
                   CONTACT US
                 </Nav.Link>
               </Nav>
             </Navbar.Collapse>
 
-            {/* Right Logo
-            <img
-              src="/src/assets/cima_research_foundation_logo.jpg"
-              alt="Right Logo"
-              className="navbar-logo"
-              style={{ height: '100px' }}
-            /> */}
+            {/* ICPAC Logo */}
+            <div className="d-flex align-items-center">
+              <img
+                src={leftLogo}
+                alt="ICPAC Logo"
+                className="navbar-logo ms-3"
+              />
+            </div>
           </Container>
         </Navbar>
 
-        {/* Main Routes */}
+        {/* Main Content Area */}
         <div className="main-content">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/map" element={<MapViewer />} />
-            <Route path="/reports" element={<Reports />} />
             <Route path="/analysis" element={<Analysis />} />
             <Route path="/indicators" element={<Indicators/>} />
             <Route path="/about" element={<About/>} />
@@ -117,20 +95,9 @@ const App = () => {
           </Routes>
         </div>
 
-        <footer 
-          className="footer-custom"
-          style={{
-            backgroundColor: '#1B5E20',
-            color: '#fff',
-            padding: '1rem',
-            textAlign: 'center',
-            position: 'fixed',
-            bottom: 0,
-            width: '100%',
-            zIndex: 1000
-          }}
-        >
-          © 2025 East Africa Flood Watch | IGAD-ICPAC
+        {/* Footer Section */}
+        <footer className="footer">
+          <div>© 2025 East Africa Flood Watch | IGAD-ICPAC</div>
         </footer>
       </div>
     </Router>

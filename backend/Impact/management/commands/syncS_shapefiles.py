@@ -15,6 +15,7 @@ class Command(BaseCommand):
     SHAPEFILE_DIR = './temp_shapefiles'
     SECTOR_FILENAME = 'fp_sections_igad.shp'
     
+    # Updated field mapping with correct geometry type
     field_mapping = {
         'sec_code': 'SEC_CODE',
         'sec_name': 'SEC_NAME',
@@ -32,7 +33,7 @@ class Command(BaseCommand):
         'q_thr3': 'Q_THR3',
         'cat': 'cat',
         'id': 'ID',
-        'geom': 'POINT'
+        'geom': 'POINT'  # Changed back to 'POINT' to match Django's geometry field type
     }
     
     def handle(self, *args, **kwargs):
@@ -62,10 +63,7 @@ class Command(BaseCommand):
         sftp_port = config('SFTP_PORT')
         sftp_username = config('SFTP_USERNAME')
         sftp_password = config('SFTP_PASSWORD')
-        
-        # Get the remote directory and clean it
-        remote_dir = config('SHAPEFILE_REMOTE_DIR')
-        remote_dir = remote_dir.rstrip('/').replace('//', '/')  # Remove trailing slash and any double slashes
+        sectors_remote_folder = config('SHAPEFILE_REMOTE_DIR')
         
         extensions = ['.shp', '.shx', '.dbf', '.prj']
         base_filename = os.path.splitext(self.SECTOR_FILENAME)[0]
@@ -77,11 +75,7 @@ class Command(BaseCommand):
             for ext in extensions:
                 remote_file = f"{base_filename}{ext}"
                 local_path = os.path.join(self.SHAPEFILE_DIR, remote_file)
-                
-                # Construct remote path carefully without extra quotes or slashes
-                remote_path = f"{remote_dir}/{remote_file}"
-                
-                self.stdout.write(f"Attempting to download from: {remote_path}")
+                remote_path = os.path.join(sectors_remote_folder, remote_file).replace('\\', '/')
                 
                 try:
                     self.stdout.write(f"Downloading {remote_file}...")
@@ -118,7 +112,7 @@ class Command(BaseCommand):
                 SectorData,
                 file_path,
                 self.field_mapping,
-                transform=True,
+                transform=True,  # Added transform=True to ensure proper coordinate transformation
                 encoding='iso-8859-1'
             )
             lm.save(strict=True, verbose=True)

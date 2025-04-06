@@ -1,4 +1,3 @@
-// frontend/src/components/MapViewer.jsx
 import React, { useState, useCallback, useEffect } from "react";
 import {
   MapContainer,
@@ -13,7 +12,7 @@ import { ListGroup, Nav, Tab } from "react-bootstrap";
 import "leaflet/dist/leaflet.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 import L from "leaflet";
-import { DischargeChart, GeoSFMChart } from "../utils/chartUtils.jsx"; // Import from utils
+import { DischargeChart, GeoSFMChart } from "../utils/chartUtils.jsx";
 
 // Configuration for the map's initial state and WMS server
 const MAP_CONFIG = {
@@ -22,6 +21,11 @@ const MAP_CONFIG = {
   geoserverWMSUrl: `http://197.254.1.10:8093/geoserver/floodwatch/wms`,
   getFeatureInfoFormat: "application/json",
 };
+
+// Define the GeoJSON path based on environment
+const GEOJSON_PATH = process.env.NODE_ENV === "production"
+  ? "/data/timeseries_data/merged_data.geojson"  // Docker path
+  : "/merged_data.geojson";  // Local development path
 
 // Configuration for monitoring stations (fp_sections_igad points)
 const MONITORING_STATIONS_CONFIG = {
@@ -383,16 +387,7 @@ const MapViewer = () => {
   const [map, setMap] = useState(null);
   const [selectedLayers, setSelectedLayers] = useState(new Set());
   const [isSidebarActive, setIsSidebarActive] = useState(true);
-
-  const toggleSidebar = () => {
-    setIsSidebarActive(!isSidebarActive);
-  };
-  
-  
-
-  const [selectedBoundaryLayers, setSelectedBoundaryLayers] = useState(
-    new Set(),
-  );
+  const [selectedBoundaryLayers, setSelectedBoundaryLayers] = useState(new Set());
   const [activeLegend, setActiveLegend] = useState(null);
   const [mapKey, setMapKey] = useState(0);
   const [showMonitoringStations, setShowMonitoringStations] = useState(false);
@@ -412,35 +407,46 @@ const MapViewer = () => {
   const [featurePopups, setFeaturePopups] = useState([]);
   const [isLayerControlVisible, setIsLayerControlVisible] = useState(false);
 
+  // Function to fetch GeoJSON data
+  const fetchMonitoringData = useCallback(() => {
+    fetch(GEOJSON_PATH)
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+      })
+      .then((data) => {
+        data.features.forEach((feature) => {
+          if (feature.geometry?.coordinates) {
+            feature.properties.latitude = feature.geometry.coordinates[1];
+            feature.properties.longitude = feature.geometry.coordinates[0];
+          }
+        });
+        setMonitoringData(data);
+      })
+      .catch((error) => {
+        console.error("Error loading monitoring data:", error);
+        setMonitoringData(null); // Reset on error
+      });
+  }, []);
+
+  // Fetch monitoring data when toggled on and periodically
   useEffect(() => {
     if (showMonitoringStations) {
-      fetch("merged_data.geojson") // Adjust path to match public directory
-        .then((response) => response.json())
-        .then((data) => {
-          data.features.forEach((feature) => {
-            if (feature.geometry?.coordinates) {
-              feature.properties.latitude = feature.geometry.coordinates[1];
-              feature.properties.longitude = feature.geometry.coordinates[0];
-            }
-          });
-          setMonitoringData(data);
-        })
-        .catch((error) =>
-          console.error("Error loading monitoring data:", error),
-        );
+      fetchMonitoringData(); // Initial fetch
+      const interval = setInterval(fetchMonitoringData, 60000); // Refresh every 60 seconds
+      return () => clearInterval(interval); // Cleanup on unmount or toggle off
     } else {
       setMonitoringData(null);
       setTimeSeriesData([]);
       setSelectedStation(null);
     }
-  }, [showMonitoringStations]);
+  }, [showMonitoringStations, fetchMonitoringData]);
 
   useEffect(() => {
     if (showGeoFSM) {
       fetch("hydro_data_with_locations.geojson")
         .then((response) => response.json())
         .then((data) => {
-          // Extract available years from the data
           const years = [
             ...new Set(
               data.features.map((f) =>
@@ -451,7 +457,6 @@ const MapViewer = () => {
           setAvailableYears(years);
           setSelectedYear(years[0]?.toString() || "2023");
 
-          // Filter data by selected year
           const filteredData = {
             ...data,
             features: data.features.filter(
@@ -652,12 +657,14 @@ const MapViewer = () => {
     setFeaturePopups([]);
   }, [selectedLayers, selectedBoundaryLayers]);
 
+  const toggleSidebar = () => setIsSidebarActive(!isSidebarActive);
+
   return (
     <div className="map-viewer">
       <button className="toggle-sidebar-btn" onClick={toggleSidebar}>
-        {isSidebarActive ? '✕' : '☰'}
+        {isSidebarActive ? "✕" : "☰"}
       </button>
-      <div className={`sidebar ${isSidebarActive ? 'active' : ''}`}>
+      <div className={`sidebar ${isSidebarActive ? "active" : ""}`}>
         <TabSidebar
           hazardLayers={HAZARD_LAYERS}
           impactLayers={IMPACT_LAYERS}

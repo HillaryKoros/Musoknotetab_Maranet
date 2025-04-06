@@ -116,7 +116,7 @@ const Analysis = () => {
   const [error, setError] = useState(null);
 
   // API Endpoints with fallback mechanism
-  const PRIMARY_HOST = "http://127.0.0.1:8090";
+  const PRIMARY_HOST = "http://197.254.1.10:8090";
   const SECONDARY_HOST = "http://10.10.1.13:8090";
   
   // Initialize endpoints with primary host

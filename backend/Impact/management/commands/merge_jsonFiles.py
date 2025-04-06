@@ -11,6 +11,10 @@ import tempfile
 class Command(BaseCommand):
     help = 'Download and process remote JSON and shapefile data from an SFTP server.'
 
+    """
+    Constructs the remote SFTP path for JSON data based on a given date.
+    Returns a tuple of (base_path, full_path, base_date).
+    """
     def get_data_path(self, base_date=None):
         if base_date is None:
             base_date = datetime.now()
@@ -25,41 +29,50 @@ class Command(BaseCommand):
         
         return base_path, full_path, base_date
 
-    def get_frontend_public_dir(self):
-        """Get the frontend/public directory at the project root."""
-        # Get the directory of manage.py (backend/), then go up one level and into frontend/public
-        manage_py_dir = os.path.dirname(os.path.abspath(__file__))  # backend/Impact/management/commands/
-        project_root = os.path.abspath(os.path.join(manage_py_dir, '../../../../'))  # /home/.../flood_watch_system/
-        frontend_public = os.path.join(project_root, 'frontend', 'public')
+    """
+    Determines the output directory, enforcing the shared volume (/app/shared_data/timeseries_data).
+    Returns a tuple of (directory_path, is_shared_volume_flag).
+    """
+    def get_output_dir(self):
+        # Enforce shared volume only
+        shared_dir = '/app/shared_data/timeseries_data'
+        is_shared_volume = True
         
-        # Verify the directory exists
-        if not os.path.exists(frontend_public):
-            raise Exception(f"Directory {frontend_public} does not exist. Expected it at project root based on structure.")
+        if not os.path.exists(shared_dir):
+            try:
+                os.makedirs(shared_dir)
+                self.stdout.write(self.style.SUCCESS(f"Created shared volume directory: {shared_dir}"))
+            except Exception as e:
+                raise Exception(f"Could not create {shared_dir}: {e}. Check permissions or volume mounting.")
         
-        # Verify it's writable
-        test_file = os.path.join(frontend_public, '.write_test')
         try:
+            # Verify writability
+            test_file = os.path.join(shared_dir, '.write_test')
             with open(test_file, 'w') as f:
                 f.write('test')
             os.remove(test_file)
-            self.stdout.write(self.style.SUCCESS(f"Using writable directory: {frontend_public}"))
-            return frontend_public
+            self.stdout.write(self.style.SUCCESS(f"Using writable shared volume: {shared_dir}"))
         except (IOError, PermissionError) as e:
-            raise Exception(f"Directory {frontend_public} is not writable: {e}. Check permissions or run with sufficient privileges.")
+            raise Exception(f"Shared volume {shared_dir} not writable: {e}. Ensure permissions and volume are correctly configured.")
+        
+        return shared_dir, is_shared_volume
 
+    """
+    Checks if a remote path exists on the SFTP server.
+    Returns True if the path exists, False otherwise.
+    """
     def check_remote_path_exists(self, sftp, path):
-        """Check if a remote path exists on the SFTP server."""
         try:
             sftp.stat(path)
             return True
         except IOError:
             return False
 
+    """
+    Finds the most recent valid JSON path on the SFTP server, falling back up to max_retries days.
+    Returns a tuple of (path, date) or (None, None) if no valid path is found.
+    """
     def get_valid_json_path(self, sftp, max_retries=7):
-        """
-        Get the most recent valid JSON path, falling back to previous days if needed.
-        Returns tuple of (path, date) or (None, None) if no valid path found.
-        """
         current_date = datetime.now()
         
         for i in range(max_retries):
@@ -71,12 +84,16 @@ class Command(BaseCommand):
                 
         return None, None
 
+    """
+    Main entry point for the command.
+    Handles the workflow: determines output directory, syncs data, processes it, and saves the result.
+    """
     def handle(self, *args, **kwargs):
         try:
-            # Get the frontend/public directory path
-            frontend_public_dir = self.get_frontend_public_dir()
-            output_file = os.path.join(frontend_public_dir, 'merged_data.geojson')
-            self.stdout.write(self.style.SUCCESS(f"Will save directly to: {output_file}"))
+            # Get the output directory (shared volume only)
+            output_dir, is_shared_volume = self.get_output_dir()
+            output_file = os.path.join(output_dir, 'merged_data.geojson')
+            self.stdout.write(self.style.SUCCESS(f"Will save to: {output_file} (Shared volume: {is_shared_volume})"))
             
             # Create temporary directory for processing intermediate files
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -88,15 +105,18 @@ class Command(BaseCommand):
                 # Sync data from SFTP server to temp directory
                 json_files, shapefile_dir = self.sync_data(json_dir, shapefile_dir)
                 
-                # Process and merge data, saving directly to frontend/public/
+                # Process and merge data, saving to the shared volume
                 self.process_and_merge_data(json_files, shapefile_dir, output_file)
 
         except Exception as e:
             self.stderr.write(self.style.ERROR(f"Error: {e}"))
             raise
 
+    """
+    Establishes an SFTP connection using credentials from environment variables.
+    Returns an SFTP client object or raises an exception on failure.
+    """
     def connect_sftp(self):
-        """Establish an SFTP connection."""
         hostname = config('SFTP_HOST')
         port = int(config('SFTP_PORT'))
         username = config('SFTP_USERNAME')
@@ -109,8 +129,11 @@ class Command(BaseCommand):
         except Exception as e:
             raise Exception(f"Failed to connect to SFTP server: {e}")
 
+    """
+    Downloads JSON and shapefile data from the SFTP server to temporary local directories.
+    Returns a tuple of (json_files_list, shapefile_dir).
+    """
     def sync_data(self, json_dir, shapefile_dir):
-        """Download JSON and shapefile data from remote SFTP server."""
         sftp = self.connect_sftp()
 
         try:
@@ -140,8 +163,11 @@ class Command(BaseCommand):
         finally:
             sftp.close()
 
+    """
+    Downloads files with specified extensions from a remote SFTP directory to a local directory.
+    Returns a list of downloaded file paths.
+    """
     def download_files(self, sftp, remote_dir, local_dir, extensions):
-        """Download files with specified extensions from a remote directory."""
         try:
             remote_files = sftp.listdir(remote_dir)
         except IOError as e:
@@ -173,13 +199,17 @@ class Command(BaseCommand):
 
         return downloaded_files
 
+    """
+    Merges JSON data with shapefiles and saves the result as a GeoJSON file to the output location.
+    Handles CRS assignment and data validation.
+    """
     def process_and_merge_data(self, json_files, shapefile_dir, output_file):
-        """Merge JSON data with shapefiles and save directly as GeoJSON to frontend/public."""
         try:
             # Ensure the output directory exists and is writable
             output_dir = os.path.dirname(output_file)
             if not os.path.exists(output_dir):
-                raise Exception(f"Output directory {output_dir} does not exist. Expected it at project root.")
+                os.makedirs(output_dir)
+                self.stdout.write(self.style.SUCCESS(f"Created output directory: {output_dir}"))
             
             # Test if the directory is writable
             test_file = os.path.join(output_dir, '.write_test')
@@ -189,7 +219,7 @@ class Command(BaseCommand):
                 os.remove(test_file)
                 self.stdout.write(self.style.SUCCESS(f"Directory {output_dir} is writable"))
             except (IOError, PermissionError) as e:
-                raise Exception(f"Cannot write to {output_dir}: {e}. Ensure frontend/public permissions are correct.")
+                raise Exception(f"Cannot write to {output_dir}: {e}. Ensure permissions are correct.")
 
             # Find the shapefile
             shapefile_path = next(
@@ -257,12 +287,12 @@ class Command(BaseCommand):
                 # Add metadata about the data date
                 final_gdf.attrs['data_date'] = datetime.now().strftime('%Y-%m-%d')
                 
-                # Save directly to the specified output file
+                # Save to the output file
                 if os.path.exists(output_file):
                     os.remove(output_file)
                 
                 final_gdf.to_file(output_file, driver='GeoJSON')
-                self.stdout.write(self.style.SUCCESS(f"Merged GeoJSON saved directly at {output_file}"))
+                self.stdout.write(self.style.SUCCESS(f"Merged GeoJSON saved at {output_file}"))
             else:
                 self.stdout.write(self.style.WARNING("No data to merge."))
 

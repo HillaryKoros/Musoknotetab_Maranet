@@ -15,12 +15,12 @@
   left: 0;
   right: 0;
   z-index: 1000;
-  min-height: 60px;
+  min-height: 80px;
   height: auto;
 }
 
 .navbar-logo {
-  height: 50px;
+  height: 70px;
   width: auto;
   max-width: 100%;
   transition: height 0.3s ease;
@@ -34,7 +34,7 @@
 }
 
 .brand-logo {
-  height: 40px;
+  height: 70px;
   width: auto;
   max-width: 100%;
   transition: height 0.3s ease;
@@ -142,10 +142,10 @@
   background-color: #ffffff;
   box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
   overflow-y: auto;
-  height: calc(100vh - 90px);
+  height: calc(100vh - 80px);
   position: fixed;
   left: 0;
-  top: 80px;
+  top: 90px;
   z-index: 998;
 }
 
@@ -269,17 +269,17 @@
   bottom: 30px;
   left: 350px;
   right: 0;
-  height: 400px;
+  height: 330px;
   background: white;
   border-top: 1px solid #ddd;
   box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
-  z-index: 997;
+  z-index: 1;
   transition: height 0.3s ease;
 }
 
 .chart-container {
   width: 100%;
-  height: 380px;
+  height: 330px;
   padding: 0 20px 10px 20px;
 }
 
@@ -290,7 +290,7 @@
   padding: 10px 20px;
   border-bottom: 1px solid #ddd;
   background: #f8f9fa;
-  height: 80px;
+  height: 45px;
 }
 
 .chart-header h5 {
@@ -301,12 +301,12 @@
 }
 
 .chart-container .x-axis-labels {
-  font-size: 10px; /* Smaller labels on mobile */
-  transform: rotate(-60deg); /* More rotation to fit */
+  font-size: 13px; /* Smaller labels on mobile */
+  transform: rotate(-45deg); /* More rotation to fit */
 }
 
 .chart-container .y-axis-labels {
-  font-size: 10px; /* Smaller y-axis labels on mobile */
+  font-size: 13px; /* Smaller y-axis labels on mobile */
 }
 
 .close-button {
@@ -520,7 +520,7 @@ input:checked + .toggle-slider-small:before {
     max-width: 100%;
     height: auto;
     position: fixed;
-    top: 60px;
+    top: 90px;
     left: -100%;
     transition: left 0.3s ease;
     z-index: 999;

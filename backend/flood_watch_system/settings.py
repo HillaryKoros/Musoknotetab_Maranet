@@ -59,10 +59,10 @@ CORS_ALLOWED_ORIGINS = [
     "http://10.10.1.13:8090",  # Backend in staging
     "http://127.0.0.1:8094",   # Frontend local
     "http://localhost:8094",   # Frontend local alternative
-    "http://42.220.118.182:8094",  # Frontend public
+    "http://197.254.1.10:8094",  # Frontend public
     "http://127.0.0.1:8090",   # Backend local
     "http://localhost:8090",   # Backend local alternative
-    "http://42.220.118.182:8090",   # Backend public
+    "http://197.254.1.10:8090",   # Backend public
     "http://0.0.0.0:8090",
     "http://0.0.0.0:8090",
 
@@ -74,7 +74,7 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
     '0.0.0.0',
-    '42.220.118.182',  # Public IP
+    '197.254.1.10',  # Public IP
 ]
 
 # CORS settings
@@ -178,45 +178,20 @@ CELERY_TIMEZONE = 'Africa/Nairobi'
 
 
 CELERY_BEAT_SCHEDULE = {
-    'import-admin1-at-noon': {
-        'task': 'Impact.tasks.run_management_command',
-        'schedule': crontab(hour=12, minute=0),  # Noon UTC
-        'args': ('import_admin1',),
-    },
-    'load-timeseries-at-noon': {
-        'task': 'Impact.tasks.run_management_command',
-        'schedule': crontab(hour=12, minute=0),
-        'args': ('load_timeseries',),
-    },
     'merge-jsonfiles-at-noon': {
         'task': 'Impact.tasks.run_management_command',
         'schedule': crontab(hour=12, minute=0),
-        'args': ('merge_jsonFiles',),
+        'args': ('merge_jsonFiles',), 
     },
     'syncD-shapefiles-at-noon': {
         'task': 'Impact.tasks.run_management_command',
         'schedule': crontab(hour=12, minute=0),
         'args': ('syncD_shapefiles',),
     },
-    'sync-raster-at-noon': {
-        'task': 'Impact.tasks.run_management_command',
-        'schedule': crontab(hour=12, minute=0),
-        'args': ('sync_raster',),
-    },
-    'syncS-shapefiles-at-noon': {
-        'task': 'Impact.tasks.run_management_command',
-        'schedule': crontab(hour=12, minute=0),
-        'args': ('syncS_shapefiles',),
-    },
     'sync-tiffs-at-noon': {
         'task': 'Impact.tasks.run_management_command',
         'schedule': crontab(hour=12, minute=0),
         'args': ('sync_tiffs',),
-    },
-    'sync-timeseries-at-noon': {
-        'task': 'Impact.tasks.run_management_command',
-        'schedule': crontab(hour=12, minute=0),
-        'args': ('sync_timeseries',),
     },
 }
 # DRF Spectacular settings

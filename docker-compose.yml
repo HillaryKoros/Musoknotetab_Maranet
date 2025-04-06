@@ -4,12 +4,12 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     image: hkoros/flood_watch_system_backend:v1.2
+    container_name: flood_watch_backend
     command: gunicorn flood_watch_system.wsgi:application --bind 0.0.0.0:8000
     volumes:
       - static_volume:/backend/staticfiles
       - media_volume:/backend/mediafiles
-      - ./shared_data:/backend/data:rw
-      - ./frontend/public:/frontend/public
+      - shared_data_volume:/app/shared_data:rw  # Shared volume for timeseries data
     ports:
       - "8090:8000"
     environment:
@@ -30,20 +30,74 @@ services:
       - JSON_REMOTE_DIR=${JSON_REMOTE_DIR}
       - SHAPEFILE_REMOTE_DIR=${SHAPEFILE_REMOTE_DIR}
       - GEOSERVER_URL=${GEOSERVER_URL:-http://flood_watch_geoserver:8093/geoserver}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # healthcheck:
-    #   test: ["CMD", "curl", "--fail", "http://localhost:8000/health/"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
-    #   start_period: 60s
     restart: unless-stopped
     networks:
       - app-network
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: hkoros/flood_watch_system_celery_worker:v1.2
+    container_name: flood_watch_celery_worker
+    command: celery -A flood_watch_system worker -l info
+    volumes:
+      - shared_data_volume:/app/shared_data:rw  # Consistent mount for timeseries data
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DB_HOST=flood_watch_postgis
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DJANGO_SETTINGS_MODULE=flood_watch_system.settings
+      - SFTP_HOST=${SFTP_HOST}
+      - SFTP_PORT=${SFTP_PORT}
+      - SFTP_USERNAME=${SFTP_USERNAME}
+      - SFTP_PASSWORD=${SFTP_PASSWORD}
+      - JSON_REMOTE_DIR=${JSON_REMOTE_DIR}
+      - SHAPEFILE_REMOTE_DIR=${SHAPEFILE_REMOTE_DIR}
+    depends_on:
+      - web
+      - redis
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: hkoros/flood_watch_system_celery_beat:v1.2
+    container_name: flood_watch_celery_beat
+    command: celery -A flood_watch_system beat -l info
+    volumes:
+      - shared_data_volume:/app/shared_data:rw  # Consistent mount for timeseries data
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - DB_HOST=flood_watch_postgis
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DJANGO_SETTINGS_MODULE=flood_watch_system.settings
+    depends_on:
+      - web
+      - redis
+    networks:
+      - app-network
+    restart: unless-stopped
 
   db:
     image: hkoros/floodwatch_postgis:v1.2
@@ -55,7 +109,7 @@ services:
       - POSTGRES_HOST_AUTH_METHOD=md5
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
-      - postgis_data:/var/lib/postgresql/data/pgdata
+      - postgis_data:/var/lib/postgresql/data/pgdata  # Dedicated volume for DB data
     ports:
       - "8091:5432"
     networks:
@@ -70,6 +124,7 @@ services:
 
   redis:
     image: hkoros/redis:v1.2
+    container_name: flood_watch_redis
     ports:
       - "8092:6379"
     command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
@@ -82,7 +137,7 @@ services:
     networks:
       - app-network
     restart: unless-stopped
-   
+
   geoserver:
     image: hkoros/floodwatch_geoserver:v1.2
     container_name: flood_watch_geoserver
@@ -105,36 +160,32 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s 
+      start_period: 60s
     networks:
       - app-network
+
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       target: production
     image: hkoros/flood_watch_system_frontend:v1.2
+    container_name: flood_watch_frontend
     ports:
       - "8094:8080"
     volumes:
       - static_volume:/frontend/static
       - media_volume:/frontend/media
-      - ./shared_data:/usr/share/nginx/html/data:rw
+      - shared_data_volume:/usr/share/nginx/html/data:rw  # Mount for accessing timeseries data
     environment:
-    - NODE_ENV=production
-    - VITE_API_URL=http://197.254.1.10:8090
-    - VITE_GEOSERVER_URL=http://197.254.1.10:8093/geoserver
+      - NODE_ENV=production
+      - VITE_API_URL=http://197.254.1.10:8090
+      - VITE_GEOSERVER_URL=http://197.254.1.10:8093/geoserver
     depends_on:
       - web
     networks:
       - app-network
     restart: unless-stopped
-    # healthcheck:
-    #   test: ["CMD", "curl", "--fail", "http://localhost:8094/"]
-    #   interval: 1m30s
-    #   timeout: 30s
-    #   retries: 5
-    #   start_period: 30s
 
 networks:
   app-network:
@@ -156,4 +207,4 @@ volumes:
   geoserver_styles:
     driver: local
   shared_data_volume:
-    driver: local
+    driver: local  # Dedicated volume for timeseries data sharing

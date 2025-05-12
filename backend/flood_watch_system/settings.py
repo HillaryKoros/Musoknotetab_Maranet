@@ -63,17 +63,15 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:8090",   # Backend local
     "http://localhost:8090",   # Backend local alternative
     "http://197.254.1.10:8090",   # Backend public
-    "http://0.0.0.0:8090",
-    "http://0.0.0.0:8090",
+   
 
 ]
-
+HOST_URL = config('HOST_URL', default='http://197.254.1.10:8094')
 # Allowed Hosts
 ALLOWED_HOSTS = [
     '10.10.1.13',  # Staging server IP
     'localhost',
     '127.0.0.1',
-    '0.0.0.0',
     '197.254.1.10',  # Public IP
 ]
 
@@ -185,12 +183,12 @@ CELERY_BEAT_SCHEDULE = {
     },
     'syncD-shapefiles-at-noon': {
         'task': 'Impact.tasks.run_management_command',
-        'schedule': crontab(hour=12, minute=0),
+        'schedule': crontab(hour=12, minute=5),
         'args': ('syncD_shapefiles',),
     },
     'sync-tiffs-at-noon': {
         'task': 'Impact.tasks.run_management_command',
-        'schedule': crontab(hour=12, minute=0),
+        'schedule': crontab(hour=12, minute=10),
         'args': ('sync_tiffs',),
     },
 }

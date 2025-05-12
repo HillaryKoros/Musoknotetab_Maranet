@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -147,6 +147,12 @@ const TabSidebar = ({
   selectedYear,
   setSelectedYear,
   availableYears,
+  showMikeHydro,
+  setShowMikeHydro,
+  showFastFlood,
+  setShowFastFlood,
+  showGlofas,
+  setShowGlofas,
 }) => (
   <div className="sidebar">
     <Tab.Container defaultActiveKey="forecast">
@@ -164,7 +170,7 @@ const TabSidebar = ({
       </Nav>
       <Tab.Content>
         <Tab.Pane eventKey="forecast" className="tab-pane">
-          <h4>Forecast River Discharge</h4>
+          <h4>Station Information</h4>
           <ListGroup className="mb-4">
             <ListGroup.Item>
               <div className="toggle-switch-small">
@@ -180,7 +186,7 @@ const TabSidebar = ({
                 ></label>
               </div>
               <label htmlFor="monitoring-stations-toggle">
-                fp_sections_igad
+                FloodProofs East Africa
               </label>
             </ListGroup.Item>
             <ListGroup.Item>
@@ -211,6 +217,57 @@ const TabSidebar = ({
                   ))}
                 </select>
               )}
+            </ListGroup.Item>
+            <ListGroup.Item>
+              <div className="toggle-switch-small">
+                <input
+                  type="checkbox"
+                  id="mike-hydro-toggle"
+                  checked={showMikeHydro}
+                  onChange={() => setShowMikeHydro(!showMikeHydro)}
+                />
+                <label
+                  htmlFor="mike-hydro-toggle"
+                  className="toggle-slider-small"
+                ></label>
+              </div>
+              <label htmlFor="mike-hydro-toggle">
+                Mike Hydro
+              </label>
+            </ListGroup.Item>
+            <ListGroup.Item>
+              <div className="toggle-switch-small">
+                <input
+                  type="checkbox"
+                  id="fast-flood-toggle"
+                  checked={showFastFlood}
+                  onChange={() => setShowFastFlood(!showFastFlood)}
+                />
+                <label
+                  htmlFor="fast-flood-toggle"
+                  className="toggle-slider-small"
+                ></label>
+              </div>
+              <label htmlFor="fast-flood-toggle">
+                Fast Flood
+              </label>
+            </ListGroup.Item>
+            <ListGroup.Item>
+              <div className="toggle-switch-small">
+                <input
+                  type="checkbox"
+                  id="glofas-toggle"
+                  checked={showGlofas}
+                  onChange={() => setShowGlofas(!showGlofas)}
+                />
+                <label
+                  htmlFor="glofas-toggle"
+                  className="toggle-slider-small"
+                ></label>
+              </div>
+              <label htmlFor="glofas-toggle">
+                Glofas
+              </label>
             </ListGroup.Item>
           </ListGroup>
           {selectedStation && (
@@ -382,16 +439,48 @@ const MapLegend = ({ legendUrl, title }) => {
   ) : null;
 };
 
+// Custom WMS layer component for stable loading
+const StableWMSLayer = React.memo(({ url, layers, transparent = true, format = "image/png", version = "1.1.1" }) => {
+  const [key, setKey] = useState(0);
+  
+  // Prevent repeated requests by using a key-based approach
+  useEffect(() => {
+    setKey(prev => prev + 1);
+  }, [layers]);
+  
+  return (
+    <WMSTileLayer
+      key={`wms-${layers}-${key}`}
+      url={url}
+      layers={layers}
+      format={format}
+      transparent={transparent}
+      version={version}
+      updateWhenIdle={true}
+      updateWhenZooming={false}
+      updateInterval={200}
+      keepBuffer={2}
+    />
+  );
+});
+
 // Main MapViewer component
 const MapViewer = () => {
   const [map, setMap] = useState(null);
   const [selectedLayers, setSelectedLayers] = useState(new Set());
   const [isSidebarActive, setIsSidebarActive] = useState(true);
-  const [selectedBoundaryLayers, setSelectedBoundaryLayers] = useState(new Set());
+  // Admin 1 is always visible by default with stable loading
+  const [adminLayerLoaded, setAdminLayerLoaded] = useState(false);
+  const [selectedBoundaryLayers, setSelectedBoundaryLayers] = useState(new Set(['floodwatch:Impact_admin1']));
   const [activeLegend, setActiveLegend] = useState(null);
+  // Track screen size for responsive design
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [mapKey, setMapKey] = useState(0);
   const [showMonitoringStations, setShowMonitoringStations] = useState(false);
   const [showGeoFSM, setShowGeoFSM] = useState(false);
+  const [showMikeHydro, setShowMikeHydro] = useState(false);
+  const [showFastFlood, setShowFastFlood] = useState(false);
+  const [showGlofas, setShowGlofas] = useState(false);
   const [monitoringData, setMonitoringData] = useState(null);
   const [geoFSMData, setGeoFSMData] = useState(null);
   const [selectedStation, setSelectedStation] = useState(null);
@@ -406,6 +495,9 @@ const MapViewer = () => {
   const [availableYears, setAvailableYears] = useState(["2023"]);
   const [featurePopups, setFeaturePopups] = useState([]);
   const [isLayerControlVisible, setIsLayerControlVisible] = useState(false);
+  
+  // Use ref to prevent duplicate admin layer loads
+  const adminLayerRef = useRef(null);
 
   // Function to fetch GeoJSON data
   const fetchMonitoringData = useCallback(() => {
@@ -551,8 +643,23 @@ const MapViewer = () => {
     [activeLegend],
   );
 
+  // Handle window resize for mobile responsiveness
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
   const handleBoundaryLayerSelection = useCallback(
     (layer) => {
+      // Admin 1 remains always selected for stability
+      if (layer.layer === 'floodwatch:Impact_admin1') {
+        return; // Don't allow deselecting Admin1
+      }
+      
       setSelectedBoundaryLayers((prev) => {
         const newSelected = new Set(prev);
         if (newSelected.has(layer.layer)) {
@@ -659,15 +766,27 @@ const MapViewer = () => {
 
   const toggleSidebar = () => setIsSidebarActive(!isSidebarActive);
 
+  // Effect to handle Admin1 layer initialization
+  useEffect(() => {
+    if (map && !adminLayerLoaded) {
+      setAdminLayerLoaded(true);
+    }
+  }, [map, adminLayerLoaded]);
+
   return (
-    <div className="map-viewer">
-      <button className="toggle-sidebar-btn" onClick={toggleSidebar}>
+    <div className={`map-viewer ${isMobile ? 'mobile-view' : ''}`}>
+      <button 
+        className={`toggle-sidebar-btn ${isMobile ? 'mobile-toggle' : ''}`} 
+        onClick={toggleSidebar}
+        aria-label={isSidebarActive ? "Close sidebar" : "Open sidebar"}
+      >
         {isSidebarActive ? "✕" : "☰"}
       </button>
-      <div className={`sidebar ${isSidebarActive ? "active" : ""}`}>
+      <div className={`sidebar ${isSidebarActive ? "active" : ""} ${isMobile ? 'mobile-sidebar' : ''}`}>
         <TabSidebar
           hazardLayers={HAZARD_LAYERS}
           impactLayers={IMPACT_LAYERS}
+          boundaryLayers={BOUNDARY_LAYERS}
           selectedLayers={selectedLayers}
           onLayerSelect={handleLayerSelection}
           showMonitoringStations={showMonitoringStations}
@@ -678,9 +797,15 @@ const MapViewer = () => {
           selectedYear={selectedYear}
           setSelectedYear={setSelectedYear}
           availableYears={availableYears}
+          showMikeHydro={showMikeHydro}
+          setShowMikeHydro={setShowMikeHydro}
+          showFastFlood={showFastFlood}
+          setShowFastFlood={setShowFastFlood}
+          showGlofas={showGlofas}
+          setShowGlofas={setShowGlofas}
         />
       </div>
-      <div className="main-content">
+      <div className={`main-content ${isMobile ? 'mobile-content' : ''}`}>
         <div className="map-container">
           <MapContainer
             center={MAP_CONFIG.initialPosition}
@@ -694,16 +819,42 @@ const MapViewer = () => {
               url={BASE_MAPS[0].url}
               attribution={BASE_MAPS[0].attribution}
             />
-            {Array.from(selectedLayers).map((layerId) => (
-              <WMSTileLayer
-                key={layerId}
+            
+            {/* Admin 1 layer is always loaded by default for stability */}
+            {adminLayerLoaded && (
+              <StableWMSLayer
+                url={MAP_CONFIG.geoserverWMSUrl}
+                layers="floodwatch:Impact_admin1"
+                transparent={true}
+                format="image/png"
+                version="1.1.1"
+              />
+            )}
+            
+            {/* Other selected boundary layers */}
+            {Array.from(selectedBoundaryLayers).filter(layer => layer !== 'floodwatch:Impact_admin1').map((layerId) => (
+              <StableWMSLayer
+                key={`boundary-${layerId}`}
                 url={MAP_CONFIG.geoserverWMSUrl}
                 layers={layerId}
-                format="image/png"
                 transparent={true}
+                format="image/png"
                 version="1.1.1"
               />
             ))}
+            
+            {/* Selected impact/hazard layers */}
+            {Array.from(selectedLayers).map((layerId) => (
+              <StableWMSLayer
+                key={`layer-${layerId}`}
+                url={MAP_CONFIG.geoserverWMSUrl}
+                layers={layerId}
+                transparent={true}
+                format="image/png"
+                version="1.1.1"
+              />
+            ))}
+            
             <div
               className="toggle-label"
               onClick={() => setIsLayerControlVisible(!isLayerControlVisible)}
@@ -732,6 +883,8 @@ const MapViewer = () => {
                     />
                   </LayersControl.BaseLayer>
                 ))}
+                
+                {/* Boundary layers in layer control */}
                 {BOUNDARY_LAYERS.map((layer) => (
                   <LayersControl.Overlay
                     key={layer.layer}
@@ -751,23 +904,9 @@ const MapViewer = () => {
                     />
                   </LayersControl.Overlay>
                 ))}
-                {Array.from(selectedLayers).map((layer) => (
-                  <LayersControl.Overlay
-                    key={`${layer}-${mapKey}`}
-                    checked={true}
-                    name={layer.split(":")[1] || "Layer"}
-                  >
-                    <WMSTileLayer
-                      url={MAP_CONFIG.geoserverWMSUrl}
-                      layers={layer}
-                      format="image/png"
-                      transparent={true}
-                      version="1.1.1"
-                    />
-                  </LayersControl.Overlay>
-                ))}
               </LayersControl>
             </div>
+            
             {showMonitoringStations && monitoringData?.features && (
               <GeoJSON
                 key={`monitoring-stations-${selectedStation?.properties?.SEC_NAME || "none"}`}

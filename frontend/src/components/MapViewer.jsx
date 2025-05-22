@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -465,7 +464,6 @@ const TabSidebar = ({
       <Tab.Content>
         <Tab.Pane eventKey="forecast" className="tab-pane">
           <h4>Station Information</h4>
-          <h4>Station Information</h4>
           <ListGroup className="mb-4">
             <ListGroup.Item>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -745,14 +743,9 @@ const MapViewer = () => {
   const [activeLegend, setActiveLegend] = useState(null);
   // Track screen size for responsive design
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  // Track screen size for responsive design
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [mapKey, setMapKey] = useState(0);
   const [showMonitoringStations, setShowMonitoringStations] = useState(false);
   const [showGeoFSM, setShowGeoFSM] = useState(false);
-  const [showMikeHydro, setShowMikeHydro] = useState(false);
-  const [showFastFlood, setShowFastFlood] = useState(false);
-  const [showGlofas, setShowGlofas] = useState(false);
   const [showMikeHydro, setShowMikeHydro] = useState(false);
   const [showFastFlood, setShowFastFlood] = useState(false);
   const [showGlofas, setShowGlofas] = useState(false);
@@ -948,17 +941,6 @@ const MapViewer = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   
-
-  // Handle window resize for mobile responsiveness
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-  
   const handleBoundaryLayerSelection = useCallback(
     (layer) => {
       // Admin 1 remains always selected for stability
@@ -1095,7 +1077,6 @@ const MapViewer = () => {
           hazardLayers={HAZARD_LAYERS}
           impactLayers={IMPACT_LAYERS}
           boundaryLayers={BOUNDARY_LAYERS}
-          boundaryLayers={BOUNDARY_LAYERS}
           selectedLayers={selectedLayers}
           selectedBoundaryLayers={selectedBoundaryLayers}
           onLayerSelect={handleLayerSelection}
@@ -1118,7 +1099,6 @@ const MapViewer = () => {
         />
       </div>
       <div className={`main-content ${isMobile ? 'mobile-content' : ''}`}>
-      <div className={`main-content ${isMobile ? 'mobile-content' : ''}`}>
         <div className="map-container">
           <MapContainer
             center={MAP_CONFIG.initialPosition}
@@ -1140,7 +1120,6 @@ const MapViewer = () => {
                 url={MAP_CONFIG.mapserverWMSUrl}
                 layers={layerId}
                 transparent={true}
-                transparent={true}
                 format="image/png"
                 version="1.3.0"
               />
@@ -1157,7 +1136,6 @@ const MapViewer = () => {
                 version="1.3.0"
               />
             ))}
-            
             
             <div
               className="toggle-label"
@@ -1218,7 +1196,6 @@ const MapViewer = () => {
                 ))}
               </LayersControl>
             </div>
-            
             
             {showMonitoringStations && monitoringData?.features && (
               <GeoJSON

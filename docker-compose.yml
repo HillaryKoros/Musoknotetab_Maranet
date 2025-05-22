@@ -9,7 +9,7 @@ services:
     volumes:
       - static_volume:/backend/staticfiles
       - media_volume:/backend/mediafiles
-      - shared_data_volume:/app/shared_data:rw  # Shared volume for timeseries data
+      - ./data:/etc/mapserver/data  # Use local data folder instead of volume
     ports:
       - "8090:8000"
     environment:
@@ -29,7 +29,7 @@ services:
       - REMOTE_FOLDER_BASE=${REMOTE_FOLDER_BASE}
       - JSON_REMOTE_DIR=${JSON_REMOTE_DIR}
       - SHAPEFILE_REMOTE_DIR=${SHAPEFILE_REMOTE_DIR}
-      - GEOSERVER_URL=${GEOSERVER_URL:-http://flood_watch_geoserver:8093/geoserver}
+      - MAPSERVER_URL=${MAPSERVER_URL:-http://flood_watch_mapserver:80}
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
@@ -49,7 +49,7 @@ services:
     container_name: flood_watch_celery_worker
     command: celery -A flood_watch_system worker -l info
     volumes:
-      - shared_data_volume:/app/shared_data:rw  # Consistent mount for timeseries data
+      - ./data:/etc/mapserver/data  # Use local data folder instead of volume
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - DB_HOST=flood_watch_postgis
@@ -81,7 +81,7 @@ services:
     container_name: flood_watch_celery_beat
     command: celery -A flood_watch_system beat -l info
     volumes:
-      - shared_data_volume:/app/shared_data:rw  # Consistent mount for timeseries data
+      - ./data:/etc/mapserver/data  # Use local data folder instead of volume
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - DB_HOST=flood_watch_postgis
@@ -109,7 +109,7 @@ services:
       - POSTGRES_HOST_AUTH_METHOD=md5
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
-      - postgis_data:/var/lib/postgresql/data/pgdata  # Dedicated volume for DB data
+      - postgis_data:/var/lib/postgresql/data/pgdata
     ports:
       - "8091:5432"
     networks:
@@ -138,29 +138,30 @@ services:
       - app-network
     restart: unless-stopped
 
-  geoserver:
-    image: hkoros/floodwatch_geoserver:v1.2
-    container_name: flood_watch_geoserver
+  mapserver:
+    build:
+      context: ./data  # Changed from ./mapserver to ./data
+      dockerfile: Dockerfile  # Will use our new Dockerfile in the data directory
+    image: hkoros/floodwatch_mapserver:v1.1  # Updated version
+    container_name: flood_watch_mapserver
     ports:
-      - "8093:8080"
-    environment:
-      - GEOSERVER_DATA_DIR=/opt/geoserver/data_dir
-      - GEOSERVER_ADMIN_PASSWORD=${GEOSERVER_ADMIN_PASSWORD:-geoserver}
-      - GEOSERVER_ADMIN_USER=${GEOSERVER_ADMIN_USER:-admin}
-      - INITIAL_MEMORY=2G
-      - MAXIMUM_MEMORY=4G
-      - STABLE_EXTENSIONS=charts-plugin,control-flow-plugin
-      - JAVA_OPTS=-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -XX:+UnlockExperimentalVMOptions -XX:+UseCompressedOops -XX:+OptimizeStringConcat
+      - "8093:80"
     volumes:
-      - geoserver_data:/opt/geoserver/data_dir
-      - geoserver_styles:/opt/geoserver/styles
+      - ./data/shapefiles:/data/shapefiles:rw  # Updated path structure
+      - ./data/mapfiles:/etc/mapserver:rw  # Maps to /etc/mapserver inside container
+    user: "0:0"
+    environment:
+      - MS_MAPFILE=/etc/mapserver/master.map
+      - MS_ERRORFILE=/tmp/mapserver_error.log
+      - MS_DEBUGLEVEL=5
+    command: ["apache2ctl", "-D", "FOREGROUND"]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8080/geoserver/web/"]
+      test: ["CMD", "curl", "--fail", "http://localhost:80/cgi-bin/mapserv?map=/etc/mapserver/master.map&SERVICE=WMS&REQUEST=GetCapabilities"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 10s
     networks:
       - app-network
 
@@ -176,13 +177,14 @@ services:
     volumes:
       - static_volume:/frontend/static
       - media_volume:/frontend/media
-      - shared_data_volume:/usr/share/nginx/html/data:rw  # Mount for accessing timeseries data
+      - ./data:/etc/mapserver/data  # Use local data folder instead of volume
     environment:
       - NODE_ENV=production
-      - VITE_API_URL=http://197.254.1.10:8090
-      - VITE_GEOSERVER_URL=http://197.254.1.10:8093/geoserver
+      - VITE_API_URL=http://localhost:8090  # Use localhost instead of IP
+      - VITE_MAPSERVER_URL=http://localhost:8093  # Use localhost instead of IP
     depends_on:
       - web
+      - mapserver
     networks:
       - app-network
     restart: unless-stopped
@@ -202,9 +204,5 @@ volumes:
     driver: local
   media_volume:
     driver: local
-  geoserver_data:
+  vector_data:
     driver: local
-  geoserver_styles:
-    driver: local
-  shared_data_volume:
-    driver: local  # Dedicated volume for timeseries data sharing

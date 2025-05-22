@@ -1,0 +1,11 @@
+[
+  {
+    "id": "admin_level_1",
+    "type": "vector",
+    "category": "admin",
+    "path": "/data/shapefiles/admin/GHA_Admin1.geojson",
+    "crs": "EPSG:4326",
+    "description": "Region boundaries",
+    "wms_url": "http://localhost:8093/cgi-bin/mapserv?map=/mapfiles/admin.map&LAYERS=admin_level_1&"
+  }
+]

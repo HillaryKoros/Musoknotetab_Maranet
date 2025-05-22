@@ -1,145 +1,81 @@
 import os
 import paramiko
+import shutil
+import traceback
 from datetime import datetime, timedelta
 from decouple import config
 from django.core.management.base import BaseCommand
+from django.conf import settings
 import tempfile
-import shutil
-import requests
-from requests.auth import HTTPBasicAuth
-import traceback
-import time
-from urllib3.util.retry import Retry
-from requests.adapters import HTTPAdapter
-import rasterio
-import rasterio.warp
-import numpy as np
-from rasterio.transform import from_origin
-try:
-    from osgeo import gdal
-    GDAL_AVAILABLE = True
-except ImportError:
-    GDAL_AVAILABLE = False
+import glob
 
 class Command(BaseCommand):
-    help = 'Sync remote TIFF files from SFTP and publish to GeoServer with fallback to previous day'
+    help = 'Sync TIFF files from SFTP server and update MapServer raster files'
     
     def __init__(self):
         super().__init__()
-        self.temp_dir = tempfile.mkdtemp()
         self.current_date = datetime.now()
         self.sftp = None
+        self.temp_dir = os.path.join(tempfile.gettempdir(), 'temp_rasters')
+        os.makedirs(self.temp_dir, exist_ok=True)
         
-        # Configure TIFF files to process
-        self.tiff_configurations = {
-            'flood_hazard': 'flood_hazard_map_floodproofs_{date}0000.tif',
-            'group1_alert': 'group1_mosaic_alert_level.tif',
-            'group2_alert': 'group2_mosaic_alert_level.tif',
-            'group4_alert': 'group4_mosaic_alert_level.tif'
-        }
+        # MapServer configuration - adapt to your project structure
+        base_dir = getattr(settings, 'BASE_DIR', None)
+        if base_dir:
+            # Local development path
+            default_raster_dir = os.path.join(base_dir, '..', 'mapserver', 'data', 'rasters')
+            # Make it absolute
+            default_raster_dir = os.path.abspath(default_raster_dir)
+        else:
+            default_raster_dir = '/etc/mapserver/data/rasters'
+            
+        self.mapserver_raster_dir = config('MAPSERVER_RASTER_DIR', default=default_raster_dir)
         
-        # Merged alerts file path
-        self.merged_alerts_file = os.path.join(self.temp_dir, 'merged_alerts.tif')
+        # Group configuration
+        self.groups = ['Group 1', 'Group 2', 'Group 4']
+        self.preserve_merged = True  # Set to False to clean up all temp files
         
-        # GeoServer configuration with URL switching
-        self.primary_geoserver_url =  'http://127.0.0.1:8093/geoserver'
-        self.fallback_geoserver_url = 'http://10.10.1.13:8093/geoserver'
-        self.geoserver_url = self.primary_geoserver_url  # Start with primary URL
-        self.geoserver_username = config('GEOSERVER_USERNAME', default='admin')
-        self.geoserver_password = config('GEOSERVER_PASSWORD', default='geoserver')
-        self.geoserver_workspace = config('GEOSERVER_WORKSPACE', default='floodwatch')
-        
-        # Configure session with retry logic
-        self.session = self.create_session_with_retries()
-
-    def create_session_with_retries(self):
-        """Create a requests session with retry logic"""
-        session = requests.Session()
-        retry_strategy = Retry(
-            total=3,  # number of retries
-            backoff_factor=1,  # wait 1, 2, 4 seconds between retries
-            status_forcelist=[500, 502, 503, 504]  # HTTP status codes to retry on
-        )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
-        session.verify = False  # Note: In production, you should handle SSL properly
-        session.auth = (self.geoserver_username, self.geoserver_password)
-        return session
-
-    def check_geoserver_connection(self):
-        """Check if GeoServer is accessible, with fallback to alternate URL"""
-        def try_connection(url):
-            try:
-                response = self.session.get(
-                    f"{url}/rest/about/version",
-                    timeout=10
-                )
-                return response.status_code == 200
-            except requests.exceptions.RequestException:
-                return False
-
-        # Try primary URL first
-        self.stdout.write(f"Trying primary GeoServer URL: {self.primary_geoserver_url}")
-        if try_connection(self.primary_geoserver_url):
-            self.geoserver_url = self.primary_geoserver_url
-            self.stdout.write(self.style.SUCCESS("Connected to primary GeoServer"))
-            return True
-
-        # Fall back to secondary URL
-        self.stdout.write(self.style.WARNING(
-            f"Primary GeoServer not accessible, trying fallback URL: {self.fallback_geoserver_url}"
-        ))
-        if try_connection(self.fallback_geoserver_url):
-            self.geoserver_url = self.fallback_geoserver_url
-            self.stdout.write(self.style.SUCCESS("Connected to fallback GeoServer"))
-            return True
-
-        self.stdout.write(self.style.ERROR(
-            "Failed to connect to both primary and fallback GeoServer instances"
-        ))
-        return False
-
-    def handle(self, *args, **kwargs):
+    def handle(self, *args, **options):
         """Main command handler"""
+        # Ensure MapServer raster directory exists
         try:
-            # Check GeoServer connection first
-            if not self.check_geoserver_connection():
-                self.stderr.write(self.style.ERROR(
-                    "Cannot proceed without GeoServer connection. "
-                    "Please check GeoServer status and configuration."
-                ))
-                return
-
-            success = self.process_date(self.current_date)
-            if not success:
-                yesterday = self.current_date - timedelta(days=1)
-                self.stdout.write(self.style.WARNING(
-                    f"Today's data not found. Trying yesterday's date: {yesterday.strftime('%Y%m%d')}"
-                ))
-                success = self.process_date(yesterday)
-                
-            if not success:
-                self.stdout.write(self.style.ERROR(
-                    "Could not process data for either today or yesterday. "
-                    "Please check the logs above for specific errors."
-                ))
-                
+            os.makedirs(self.mapserver_raster_dir, exist_ok=True)
+            self.stdout.write(self.style.SUCCESS(f"MapServer raster directory: {self.mapserver_raster_dir}"))
         except Exception as e:
-            self.stderr.write(self.style.ERROR(
-                f"Critical error: {str(e)}\n"
-                f"Stack trace:\n{traceback.format_exc()}"
-            ))
-            raise
+            self.stderr.write(self.style.ERROR(f"Failed to create MapServer raster directory: {str(e)}"))
+            self.stderr.write(self.style.ERROR(f"Please check permissions or create it manually"))
+            return
+        
+        self.stdout.write("Connecting to SFTP server...")
+        try:
+            self.sftp = self.connect_sftp()
+            
+            # Try with current date first
+            current_date_success = self.process_date(self.current_date)
+            
+            # If current date fails, try with yesterday's date
+            if not current_date_success:
+                yesterday = self.current_date - timedelta(days=1)
+                self.stdout.write(self.style.WARNING(f"Today's data not available. Trying yesterday ({yesterday.strftime('%Y-%m-%d')})..."))
+                yesterday_success = self.process_date(yesterday)
+                
+                if not yesterday_success:
+                    self.stdout.write(self.style.ERROR("Could not find data for either today or yesterday."))
+                    
+        except Exception as e:
+            self.stderr.write(self.style.ERROR(f"Error: {str(e)}"))
+            traceback.print_exc()
         finally:
+            if self.sftp:
+                self.sftp.close()
             self.cleanup()
-
+        
     def connect_sftp(self):
-        """Establish an SFTP connection"""
+        """Connect to SFTP server"""
         try:
             transport = paramiko.Transport((
                 config('SFTP_HOST'),
-                int(config('SFTP_PORT'))
+                int(config('SFTP_PORT', default=22))
             ))
             transport.connect(
                 username=config('SFTP_USERNAME'),
@@ -148,490 +84,223 @@ class Command(BaseCommand):
             return paramiko.SFTPClient.from_transport(transport)
         except Exception as e:
             raise Exception(f"Failed to connect to SFTP server: {str(e)}")
-
-    def check_remote_path_exists(self, path):
-        """Check if a remote path exists"""
-        try:
-            self.sftp.stat(path)
-            return True
-        except IOError:
-            return False
-
+    
     def process_date(self, date):
         """Process files for a specific date"""
-        try:
-            if not self.sftp:
-                self.sftp = self.connect_sftp()
-            
-            if self.sync_tiffs(date):
-                # Skip merging and directly publish all files to GeoServer
-                self.publish_to_geoserver(date)
-                return True
-            return False
-        except Exception as e:
-            self.stdout.write(self.style.WARNING(f"Error processing {date.strftime('%Y%m%d')}: {str(e)}"))
-            return False
-
-    def sync_tiffs(self, date):
-        """Download TIFF files from remote SFTP server"""
-        remote_base = config('REMOTE_FOLDER_BASE')
-        remote_date = date.strftime('%Y/%m/%d/00/0000')
-        remote_folder = f"{remote_base}/{remote_date}"
-        hmc_folder = f"{remote_folder}/HMC"
-        
-        # Check if the remote folders exist
-        if not self.check_remote_path_exists(remote_folder) or not self.check_remote_path_exists(hmc_folder):
-            return False
-        
-        self.stdout.write(f"Processing files for date: {date.strftime('%Y%m%d')}")
+        date_str = date.strftime('%Y/%m/%d')
+        sftp_base_path = config('REMOTE_FOLDER_BASE', default='fp-eastafrica/storage/impact_assessment')
+        path_pattern = f"{sftp_base_path}/fp_impact_forecast/nwp_gfs-det/{date_str}/00/0000"
         
         try:
-            for store_name, filename_template in self.tiff_configurations.items():
-                filename = filename_template.format(date=date.strftime('%Y%m%d'))
-                local_path = os.path.join(self.temp_dir, filename)
-                
-                # Determine if file is in HMC folder or base folder
-                remote_path = os.path.join(
-                    hmc_folder if 'group' in filename else remote_folder,
-                    filename
-                ).replace('\\', '/')
-                
-                try:
-                    self.stdout.write(f"Downloading {filename}...")
-                    self.sftp.get(remote_path, local_path)
-                    self.stdout.write(self.style.SUCCESS(
-                        f"Downloaded {filename} to {local_path}"
-                    ))
-                except FileNotFoundError:
-                    self.stdout.write(self.style.WARNING(f"File not found at {remote_path}"))
-                    return False
-            return True
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Error during sync: {str(e)}"))
-            return False
-
-    def merge_alert_files(self):
-        """Merge the three alert TIFF files into a mosaic raster file with detailed analysis"""
-        self.stdout.write("Merging alert files...")
-        
-        try:
-            # Step 1: Get paths and validate alert files
-            alert_files = []
-            
-            for store_name, filename_template in self.tiff_configurations.items():
-                if 'alert' in store_name:
-                    filename = filename_template.format(date=self.current_date.strftime('%Y%m%d'))
-                    file_path = os.path.join(self.temp_dir, filename)
-                    
-                    if os.path.exists(file_path):
-                        alert_files.append({
-                            'path': file_path,
-                            'name': store_name,
-                            'filename': filename
-                        })
-            
-            if not alert_files:
-                self.stdout.write(self.style.WARNING("No alert files found to merge"))
+            # Check if the directory exists
+            try:
+                self.sftp.stat(path_pattern)
+            except IOError:
+                self.stdout.write(self.style.WARNING(f"Directory not found: {path_pattern}"))
                 return False
             
-            self.stdout.write(f"Found {len(alert_files)} alert files to merge: {[f['name'] for f in alert_files]}")
+            # Process flood hazard file
+            flood_hazard_file = f"flood_hazard_map_floodproofs_{date.strftime('%Y%m%d')}0000.tif"
+            flood_remote_path = f"{path_pattern}/{flood_hazard_file}"
+            flood_local_path = os.path.join(self.temp_dir, flood_hazard_file)
             
-            # Step 2: Analyze the geographical extents of each file
-            extents = []
-            
-            for file_info in alert_files:
+            flood_downloaded = False
+            try:
+                # Check if flood hazard file exists
+                self.sftp.stat(flood_remote_path)
+                
+                # Download the flood hazard file
+                self.stdout.write(f"Downloading {flood_hazard_file}...")
+                self.sftp.get(flood_remote_path, flood_local_path)
+                self.stdout.write(self.style.SUCCESS(f"Downloaded flood hazard map to {flood_local_path}"))
+                flood_downloaded = True
+                
+                # Copy to MapServer directory with proper naming
+                flood_target = os.path.join(self.mapserver_raster_dir, f"flood_hazard_{date.strftime('%Y%m%d')}.tif")
+                flood_latest = os.path.join(self.mapserver_raster_dir, "flood_hazard_latest.tif")
+                
+                shutil.copy2(flood_local_path, flood_target)
+                self.stdout.write(self.style.SUCCESS(f"Copied flood hazard map to {flood_target}"))
+                
+                # Update latest symlink or copy if symlinks not supported
+                if os.path.exists(flood_latest) or os.path.islink(flood_latest):
+                    os.remove(flood_latest)
+                
                 try:
-                    with rasterio.open(file_info['path']) as src:
-                        bounds = src.bounds
-                        extents.append({
-                            'name': file_info['name'],
-                            'bounds': bounds,
-                            'width': src.width,
-                            'height': src.height,
-                            'crs': src.crs
-                        })
-                        
-                        self.stdout.write(f"Geographical extent for {file_info['name']}:")
-                        self.stdout.write(f"  - Bounds: {bounds}")
-                        self.stdout.write(f"  - Size: {src.width}x{src.height} pixels")
-                        self.stdout.write(f"  - CRS: {src.crs}")
-                        
-                        # Read a sample of data to check for valid pixels
-                        data = src.read(1)
-                        nodata = src.nodata if src.nodata is not None else 0
-                        valid_mask = data != nodata
-                        valid_count = np.sum(valid_mask)
-                        self.stdout.write(f"  - Valid pixels: {valid_count} ({valid_count/data.size*100:.2f}%)")
-                        
+                    # Use relative path for symlink to ensure portability between environments
+                    os.symlink(os.path.basename(flood_target), flood_latest)
+                    self.stdout.write(self.style.SUCCESS(f"Created symlink for flood_hazard_latest.tif"))
+                except (OSError, AttributeError):
+                    # Fallback for Windows or systems without symlink support
+                    shutil.copy2(flood_target, flood_latest)
+                    self.stdout.write(self.style.SUCCESS(f"Copied file as flood_hazard_latest.tif"))
+                
+            except IOError as e:
+                self.stdout.write(self.style.WARNING(f"{flood_hazard_file} not found at {flood_remote_path}"))
+            
+            # Process group alert files
+            hmc_path = f"{path_pattern}/HMC"
+            try:
+                self.sftp.stat(hmc_path)
+            except IOError:
+                self.stdout.write(self.style.WARNING(f"HMC directory not found: {hmc_path}"))
+                # Return True if at least the flood hazard file was processed
+                return flood_downloaded
+            
+            # Process each group
+            alert_files_downloaded = []
+            
+            for group_name in self.groups:
+                group_dir = os.path.join(self.temp_dir, group_name)
+                os.makedirs(group_dir, exist_ok=True)
+                
+                self.stdout.write(f"Processing {group_name}...")
+                group_file = f"{group_name.lower().replace(' ', '')}_mosaic_alert_level.tif"
+                group_remote_path = f"{hmc_path}/{group_file}"
+                group_local_path = os.path.join(group_dir, group_file)
+                
+                try:
+                    # Check if file exists
+                    try:
+                        self.sftp.stat(group_remote_path)
+                    except IOError:
+                        self.stdout.write(self.style.WARNING(f"{group_file} not found at {group_remote_path}"))
+                        continue
+                    
+                    # Download the group alert file
+                    self.stdout.write(f"Downloading {group_file}...")
+                    self.sftp.get(group_remote_path, group_local_path)
+                    self.stdout.write(self.style.SUCCESS(f"Downloaded {group_file} to {group_local_path}"))
+                    alert_files_downloaded.append(group_local_path)
+                    
                 except Exception as e:
-                    self.stdout.write(self.style.ERROR(
-                        f"Error analyzing {file_info['name']}: {str(e)}"
-                    ))
+                    self.stdout.write(self.style.ERROR(f"Error processing {group_name}: {str(e)}"))
             
-            # Step 3: Check for overlaps between the alert files
-            if len(extents) >= 2:
-                self.stdout.write("Analyzing overlaps between alert files:")
-                
-                for i in range(len(extents)):
-                    for j in range(i+1, len(extents)):
-                        # Check if the two extents overlap
-                        e1 = extents[i]['bounds']
-                        e2 = extents[j]['bounds']
-                        
-                        # Two bounding boxes overlap if:
-                        # - One box's left edge is to the left of the other's right edge, AND
-                        # - One box's right edge is to the right of the other's left edge, AND
-                        # - One box's bottom edge is below the other's top edge, AND
-                        # - One box's top edge is above the other's bottom edge
-                        overlaps = (
-                            e1.left < e2.right and 
-                            e1.right > e2.left and 
-                            e1.bottom < e2.top and 
-                            e1.top > e2.bottom
-                        )
-                        
-                        self.stdout.write(f"  - {extents[i]['name']} and {extents[j]['name']}: " + 
-                                         f"{'OVERLAP' if overlaps else 'NO OVERLAP'}")
-                
-                # Calculate total extent that encompasses all alert files
-                total_left = min(e['bounds'].left for e in extents)
-                total_right = max(e['bounds'].right for e in extents)
-                total_bottom = min(e['bounds'].bottom for e in extents)
-                total_top = max(e['bounds'].top for e in extents)
-                
-                self.stdout.write("Total geographical extent needed for merged file:")
-                self.stdout.write(f"  - Width: {total_left} to {total_right}")
-                self.stdout.write(f"  - Height: {total_bottom} to {total_top}")
-                
-                # Calculate approximate resolution
-                avg_res_x = sum((e['bounds'].right - e['bounds'].left) / e['width'] for e in extents) / len(extents)
-                avg_res_y = sum((e['bounds'].top - e['bounds'].bottom) / e['height'] for e in extents) / len(extents)
-                
-                self.stdout.write(f"Average resolution: ~{avg_res_x:.8f} x ~{avg_res_y:.8f} degrees/pixel")
-                
-                # Estimate merged file size
-                est_width = int((total_right - total_left) / avg_res_x)
-                est_height = int((total_top - total_bottom) / avg_res_y)
-                
-                self.stdout.write(f"Estimated merged file size: ~{est_width}x{est_height} pixels")
-                
-                if est_width > 10000 or est_height > 10000:
-                    self.stdout.write(self.style.WARNING(
-                        f"Merged file could be very large ({est_width}x{est_height}). " + 
-                        "Consider using a multi-band approach."
-                    ))
+            # Merge alert files if any were downloaded
+            if alert_files_downloaded:
+                merged_alerts_file = self.merge_alert_files(alert_files_downloaded, date)
+                if merged_alerts_file:
+                    # Copy to MapServer directory
+                    alerts_target = os.path.join(self.mapserver_raster_dir, f"alerts_{date.strftime('%Y%m%d')}.tif")
+                    alerts_latest = os.path.join(self.mapserver_raster_dir, "alerts_latest.tif")
+                    
+                    shutil.copy2(merged_alerts_file, alerts_target)
+                    self.stdout.write(self.style.SUCCESS(f"Copied merged alerts to {alerts_target}"))
+                    
+                    # Update latest symlink
+                    if os.path.exists(alerts_latest) or os.path.islink(alerts_latest):
+                        os.remove(alerts_latest)
+                    
+                    try:
+                        # Use relative path for symlink to ensure portability
+                        os.symlink(os.path.basename(alerts_target), alerts_latest)
+                        self.stdout.write(self.style.SUCCESS(f"Created symlink for alerts_latest.tif"))
+                    except (OSError, AttributeError):
+                        # Fallback for Windows or systems without symlink support
+                        shutil.copy2(alerts_target, alerts_latest)
+                        self.stdout.write(self.style.SUCCESS(f"Copied file as alerts_latest.tif"))
             
-            # Step 4: Try different merging strategies based on analysis results
-            # First, try GDAL's BuildVRT which handles different projections and resolutions well
-            input_files = [f['path'] for f in alert_files]
+            # Return True if either flood hazard or any alert files were processed
+            return flood_downloaded or bool(alert_files_downloaded)
+            
+        except Exception as e:
+            self.stderr.write(self.style.ERROR(f"Error processing date {date.strftime('%Y-%m-%d')}: {str(e)}"))
+            traceback.print_exc()
+            return False
+    
+    def merge_alert_files(self, alert_files, date):
+        """Merge alert files using GDAL"""
+        if not alert_files:
+            return None
+        
+        self.stdout.write(f"Merging {len(alert_files)} alert files...")
+        
+        try:
+            # Import GDAL only when needed
+            try:
+                from osgeo import gdal
+                GDAL_AVAILABLE = True
+            except ImportError:
+                GDAL_AVAILABLE = False
+                self.stdout.write(self.style.WARNING("GDAL not available for merging. Trying alternative method."))
+            
+            merged_file = os.path.join(self.temp_dir, f"merged_alerts_{date.strftime('%Y%m%d')}.tif")
             
             if GDAL_AVAILABLE:
-                try:
-                    self.stdout.write("Attempting to merge with GDAL BuildVRT...")
-                    
-                    # Create VRT path
-                    vrt_path = os.path.join(self.temp_dir, 'merged_alerts.vrt')
-                    
-                    # Run gdalbuildvrt
-                    gdal.UseExceptions()
-                    vrt_options = gdal.BuildVRTOptions(resampleAlg='nearest', separate=False)
-                    vrt = gdal.BuildVRT(vrt_path, input_files, options=vrt_options)
-                    
-                    if vrt:
-                        # Get reference values from first file
-                        with rasterio.open(alert_files[0]['path']) as src:
-                            ref_nodata = src.nodata if src.nodata is not None else 0
-                        
-                        # Translate to GeoTIFF
-                        translate_options = gdal.TranslateOptions(
-                            format='GTiff',
-                            noData=ref_nodata,
-                            creationOptions=['COMPRESS=LZW']
-                        )
-                        gdal.Translate(self.merged_alerts_file, vrt, options=translate_options)
-                        vrt = None  # Close the dataset
-                        
-                        # Verify the output
-                        if os.path.exists(self.merged_alerts_file):
-                            with rasterio.open(self.merged_alerts_file) as src:
-                                data = src.read(1)
-                                nodata = src.nodata if src.nodata is not None else ref_nodata
-                                valid_mask = data != nodata
-                                valid_count = np.sum(valid_mask)
-                                
-                                self.stdout.write(f"GDAL BuildVRT merged file stats:")
-                                self.stdout.write(f"  - Shape: {data.shape}")
-                                self.stdout.write(f"  - Valid pixels: {valid_count} ({valid_count/data.size*100:.2f}%)")
-                                
-                                if valid_count > 0:
-                                    self.stdout.write(self.style.SUCCESS(
-                                        f"Alert files successfully merged with GDAL BuildVRT"
-                                    ))
-                                    return True
-                                else:
-                                    self.stdout.write(self.style.WARNING(
-                                        "GDAL BuildVRT created a file with no valid data, trying multi-band approach"
-                                    ))
-                        else:
-                            self.stdout.write(self.style.WARNING(
-                                "GDAL BuildVRT failed to create output file, trying multi-band approach"
-                            ))
-                except Exception as e:
-                    self.stdout.write(self.style.WARNING(
-                        f"GDAL BuildVRT error: {str(e)}, trying multi-band approach"
-                    ))
-            
-            # Multi-band approach: create a raster with each alert as a separate band
-            self.stdout.write("Creating multi-band raster with each alert in a separate band...")
-            
-            # Use the first file's metadata as a template
-            with rasterio.open(alert_files[0]['path']) as src:
-                out_meta = src.meta.copy()
+                # Create VRT
+                vrt_file = os.path.join(self.temp_dir, f"merged_alerts_{date.strftime('%Y%m%d')}.vrt")
+                vrt_options = gdal.BuildVRTOptions(resampleAlg='nearest', separate=False)
+                vrt = gdal.BuildVRT(vrt_file, alert_files, options=vrt_options)
                 
-                # Update for multi-band output
-                out_meta.update({
-                    'count': len(alert_files),  # One band per alert file
-                    'compress': 'lzw'
-                })
+                # Create GeoTIFF from VRT
+                gdal.Translate(merged_file, vrt, options=gdal.TranslateOptions(
+                    format='GTiff',
+                    creationOptions=['COMPRESS=LZW']
+                ))
                 
-                # Create the output file
-                with rasterio.open(self.merged_alerts_file, 'w', **out_meta) as dst:
-                    # Write each alert file as a separate band
-                    for band_idx, file_info in enumerate(alert_files, start=1):
-                        self.stdout.write(f"Writing {file_info['name']} to band {band_idx}")
-                        
-                        with rasterio.open(file_info['path']) as src:
-                            data = src.read(1)
-                            dst.write(data, band_idx)
-            
-            # Verify the multi-band output
-            with rasterio.open(self.merged_alerts_file) as src:
-                self.stdout.write(f"Multi-band file stats:")
-                self.stdout.write(f"  - Shape: {src.shape}")
-                self.stdout.write(f"  - Bands: {src.count}")
+                self.stdout.write(self.style.SUCCESS(f"Successfully merged alert files to {merged_file}"))
+                return merged_file
+            else:
+                # Fallback - just use the first alert file
+                shutil.copy2(alert_files[0], merged_file)
+                self.stdout.write(self.style.WARNING(f"GDAL not available. Using first alert file as merged file: {merged_file}"))
+                return merged_file
                 
-                # Check data in each band
-                for band in range(1, src.count + 1):
-                    data = src.read(band)
-                    nodata = src.nodata if src.nodata is not None else 0
-                    valid_mask = data != nodata
-                    valid_count = np.sum(valid_mask)
-                    
-                    self.stdout.write(f"  - Band {band} valid pixels: {valid_count} ({valid_count/data.size*100:.2f}%)")
-            
-            self.stdout.write(self.style.SUCCESS(
-                f"Created multi-band alert file with each alert in a separate band"
-            ))
-            return True
-            
         except Exception as e:
-            self.stdout.write(self.style.ERROR(
-                f"Error merging alert files: {str(e)}\n"
-                f"Stack trace: {traceback.format_exc()}"
-            ))
+            self.stderr.write(self.style.ERROR(f"Error merging alert files: {str(e)}"))
+            traceback.print_exc()
             
-            # Fall back to publishing individual alert files
-            self.stdout.write(self.style.WARNING(
-                "Falling back to publishing individual alert files"
-            ))
-            return True  # Continue with individual files
-            
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(
-                f"Error merging alert files: {str(e)}\n"
-                f"Stack trace: {traceback.format_exc()}"
-            ))
-            return False
-
-    def publish_to_geoserver(self, date):
-        """Publish TIFF files to GeoServer with improved error handling"""
-        store_date = date.strftime('%Y%m%d')
-        iso_date = date.strftime('%Y-%m-%dT%H:%M:%SZ')
-        
-        # Check if merged alerts file exists
-        merged_alerts_exists = os.path.exists(self.merged_alerts_file)
-        
-        if merged_alerts_exists:
-            # Validate merged file before using it
+            # Fallback - just use the first alert file
             try:
-                with rasterio.open(self.merged_alerts_file) as src:
-                    data = src.read(1)
-                    nodata = src.nodata if src.nodata is not None else 0
-                    # Check if the file has any valid data (non-nodata values)
-                    valid_data = data[data != nodata]
-                    if len(valid_data) == 0:
-                        self.stdout.write(self.style.WARNING(
-                            "Merged alerts file exists but contains no valid data. "
-                            "Using individual alert files instead."
-                        ))
-                        merged_alerts_exists = False
-                    else:
-                        self.stdout.write(self.style.SUCCESS(
-                            f"Validated merged alerts file: {len(valid_data)} valid pixels"
-                        ))
-            except Exception as e:
-                self.stdout.write(self.style.WARNING(
-                    f"Error validating merged alerts file: {str(e)}. "
-                    "Using individual alert files instead."
-                ))
-                merged_alerts_exists = False
-        
-        # Create publishing configuration
-        if merged_alerts_exists:
-            # Use merged alerts file if it exists and is valid
-            self.stdout.write("Using merged alerts file for publishing")
-            publish_configurations = {
-                'flood_hazard': self.tiff_configurations['flood_hazard'].format(date=store_date),
-                'alerts': 'merged_alerts.tif'  # Use the merged alerts file
-            }
-        else:
-            # Fall back to individual alert files
-            self.stdout.write("Using individual alert files for publishing")
-            publish_configurations = {
-                'flood_hazard': self.tiff_configurations['flood_hazard'].format(date=store_date)
-            }
-            
-            # Add individual alert files
-            for store_name, filename_template in self.tiff_configurations.items():
-                if 'alert' in store_name:
-                    publish_configurations[store_name] = filename_template.format(date=store_date)
-        
-        for store_name, filename in publish_configurations.items():
-            local_path = os.path.join(self.temp_dir, filename)
-            
-            if not os.path.exists(local_path):
-                self.stdout.write(self.style.WARNING(f"Skipping {filename} - file not found"))
-                continue
-            
-            # Only add date to store name if it's not the alerts layer
-            dated_store_name = store_name if store_name == 'alerts' else f"{store_name}_{store_date}"
-            self.stdout.write(f"Publishing {filename} to GeoServer as {dated_store_name}...")
-            
-            try:
-                # Delete existing store
-                self.delete_store(dated_store_name)
-                
-                # Upload file
-                success = self.upload_file(dated_store_name, local_path)
-                if not success:
-                    continue
-                
-                # Configure time dimension
-                self.configure_time_dimension(dated_store_name, iso_date)
-                
-            except Exception as e:
-                self.stdout.write(self.style.ERROR(
-                    f"Error publishing {dated_store_name}: {str(e)}\n"
-                    f"Stack trace: {traceback.format_exc()}"
-                ))
-                continue
-        
-        return True
-
-    def delete_store(self, store_name):
-        """Delete existing store if it exists"""
-        try:
-            delete_url = (f"{self.geoserver_url}/rest/workspaces/{self.geoserver_workspace}"
-                         f"/coveragestores/{store_name}?recurse=true")
-            response = self.session.delete(delete_url)
-            if response.status_code not in (200, 404):  # 404 is ok - means store didn't exist
-                self.stdout.write(self.style.WARNING(
-                    f"Unexpected status when deleting store: {response.status_code}"
-                ))
-        except requests.exceptions.RequestException as e:
-            self.stdout.write(self.style.WARNING(f"Error deleting store: {str(e)}"))
-
-    def upload_file(self, store_name, file_path):
-        """Upload file to GeoServer"""
-        store_url = (f"{self.geoserver_url}/rest/workspaces/{self.geoserver_workspace}"
-                    f"/coveragestores/{store_name}/file.geotiff")
-        
-        try:
-            with open(file_path, 'rb') as f:
-                response = self.session.put(
-                    store_url,
-                    data=f,
-                    headers={'Content-type': 'image/tiff'}
-                )
-                
-            if response.status_code != 201:
-                raise Exception(
-                    f"Failed to upload file. Status: {response.status_code}\n"
-                    f"Response: {response.text}"
-                )
-            return True
-            
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"Error uploading file: {str(e)}"))
-            return False
-
-    def configure_time_dimension(self, store_name, iso_date):
-        """Configure time dimension for the layer"""
-        layer_url = (f"{self.geoserver_url}/rest/workspaces/{self.geoserver_workspace}"
-                    f"/coveragestores/{store_name}/coverages")
-        
-        layer_config = {
-            "coverage": {
-                "name": store_name,
-                "title": store_name,
-                "enabled": True,
-                "metadata": {
-                    "entry": [
-                        {
-                            "@key": "time",
-                            "dimensionInfo": {
-                                "enabled": True,
-                                "presentation": "LIST",
-                                "units": "ISO8601",
-                                "defaultValue": iso_date,
-                                "strategy": "FIXED",
-                                "reference": "TIME"
-                            }
-                        },
-                        {
-                            "@key": "time",
-                            "$": iso_date
-                        }
-                    ]
-                }
-            }
-        }
-        
-        try:
-            response = self.session.post(
-                layer_url,
-                json=layer_config,
-                headers={'Content-type': 'application/json'}
-            )
-            
-            if response.status_code not in (201, 200):
-                self.stdout.write(self.style.WARNING(
-                    f"Layer configuration warning: {response.status_code} - {response.text}"
-                ))
-            
-        except requests.exceptions.RequestException as e:
-            self.stdout.write(self.style.ERROR(f"Error configuring time dimension: {str(e)}"))
-
+                merged_file = os.path.join(self.temp_dir, f"merged_alerts_{date.strftime('%Y%m%d')}.tif")
+                shutil.copy2(alert_files[0], merged_file)
+                self.stdout.write(self.style.WARNING(f"Using first alert file as merged file due to error: {merged_file}"))
+                return merged_file
+            except Exception as copy_error:
+                self.stderr.write(self.style.ERROR(f"Failed to use fallback method: {str(copy_error)}"))
+                return None
+    
     def cleanup(self):
-        """Cleanup resources"""
-        if self.sftp:
-            try:
-                self.sftp.close()
-            except:
-                pass
-        self.cleanup_temp_files()
-        try:
-            self.session.close()
-        except:
-            pass
-
-    def cleanup_temp_files(self):
-        """Clean up temporary files after processing"""
+        """Clean up temporary files"""
         self.stdout.write("Cleaning up temporary files...")
-        try:
-            shutil.rmtree(self.temp_dir)
-            self.stdout.write(self.style.SUCCESS("Temporary files cleaned up successfully"))
-        except Exception as e:
-            self.stdout.write(self.style.WARNING(
-                f"Error cleaning up temporary files: {e}"
-            ))
+        
+        # Find merged files
+        merged_files = glob.glob(os.path.join(self.temp_dir, "merged_alerts_*.tif"))
+        
+        # Remove all group directories
+        for group_name in self.groups:
+            group_dir = os.path.join(self.temp_dir, group_name)
+            if os.path.exists(group_dir):
+                for file in os.listdir(group_dir):
+                    file_path = os.path.join(group_dir, file)
+                    try:
+                        if os.path.isfile(file_path):
+                            os.remove(file_path)
+                            self.stdout.write(f"Removed {file_path}")
+                    except Exception as e:
+                        self.stderr.write(self.style.ERROR(f"Error removing {file_path}: {str(e)}"))
+                
+                try:
+                    os.rmdir(group_dir)
+                    self.stdout.write(f"Removed group directory {group_dir}")
+                except Exception as e:
+                    self.stderr.write(self.style.ERROR(f"Error removing directory {group_dir}: {str(e)}"))
+        
+        # Clean up flood hazard files
+        for file in glob.glob(os.path.join(self.temp_dir, "flood_hazard_*.tif")):
+            try:
+                os.remove(file)
+                self.stdout.write(f"Removed {file}")
+            except Exception as e:
+                self.stderr.write(self.style.ERROR(f"Error removing {file}: {str(e)}"))
+        
+        # If not preserving merged files, remove them too
+        if not self.preserve_merged:
+            for file in merged_files:
+                try:
+                    os.remove(file)
+                    self.stdout.write(f"Removed merged file {file}")
+                except Exception as e:
+                    self.stderr.write(self.style.ERROR(f"Error removing {file}: {str(e)}"))
+        
+        self.stdout.write(self.style.SUCCESS(f"Cleanup completed. Preserved {len(merged_files)} merged files."))

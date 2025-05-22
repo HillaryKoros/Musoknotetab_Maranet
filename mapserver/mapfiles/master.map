@@ -1,0 +1,118 @@
+MAP
+  NAME "IGAD_FloodWatch"
+  STATUS ON
+  SIZE 800 600
+  EXTENT -180 -90 180 90
+  UNITS DD
+  SHAPEPATH "/data/shapefiles"
+  IMAGECOLOR 255 255 255
+  FONTSET "/etc/mapserver/fonts.txt"
+  PROJECTION
+    "init=epsg:4326"
+  END
+  
+  # Web service configuration
+  WEB
+    METADATA
+      "wms_title" "IGAD FloodWatch Map Service"
+      "wms_abstract" "Provides access to East Africa flood monitoring data"
+      "wms_onlineresource" "http://localhost:8093/cgi-bin/mapserv?map=/etc/mapserver/master.map"
+      "wms_srs" "EPSG:4326 EPSG:3857"
+      "wms_enable_request" "*"
+      "wms_feature_info_mime_type" "application/json"
+    END
+    TEMPPATH "/var/www/html/ms_tmp/"
+    IMAGEPATH "/var/www/html/ms_tmp/"
+    IMAGEURL "/ms_tmp/"
+  END
+  
+  # Include admin.map which contains Admin1 layer
+  INCLUDE "/etc/mapserver/admin.map"
+  
+  # Keep these layers for compatibility with the existing frontend
+  # They won't display any data since the files don't exist
+  # This prevents errors in the frontend when it tries to load these layers
+  LAYER
+    NAME "lakes"
+    STATUS ON
+    TYPE POLYGON
+    DATA "/data/shapefiles/admin/empty.geojson"
+    METADATA
+      "wms_title" "Lakes"
+    END
+    PROJECTION
+      "init=epsg:4326"
+    END
+  END
+  
+  LAYER
+    NAME "rivers"
+    STATUS ON
+    TYPE LINE
+    DATA "/data/shapefiles/admin/empty.geojson"
+    METADATA
+      "wms_title" "Rivers"
+    END
+    PROJECTION
+      "init=epsg:4326"
+    END
+  END
+  
+  LAYER
+    NAME "basins"
+    STATUS ON
+    TYPE POLYGON
+    DATA "/data/shapefiles/admin/empty.geojson"
+    METADATA
+      "wms_title" "Basins"
+    END
+    PROJECTION
+      "init=epsg:4326"
+    END
+  END
+  
+  LAYER
+    NAME "admin2"
+    STATUS ON
+    TYPE POLYGON
+    DATA "/data/shapefiles/admin/empty.geojson"
+    METADATA
+      "wms_title" "Admin Level 2"
+    END
+    PROJECTION
+      "init=epsg:4326"
+    END
+  END
+  
+  # Default output format
+  OUTPUTFORMAT
+    NAME "png"
+    DRIVER "AGG/PNG"
+    MIMETYPE "image/png"
+    IMAGEMODE RGBA
+    EXTENSION "png"
+    TRANSPARENT ON
+  END
+
+  # JSON output format for GetFeatureInfo
+  OUTPUTFORMAT
+    NAME "geojson"
+    DRIVER "OGR/GEOJSON"
+    FORMATOPTION "STORAGE=stream"
+    FORMATOPTION "FORM=SIMPLE"
+    MIMETYPE "application/json; subtype=geojson"
+  END
+
+  # Default legend
+  LEGEND
+    STATUS ON
+    KEYSIZE 18 12
+    LABEL
+      TYPE TRUETYPE
+      FONT "sans"
+      SIZE 8
+      COLOR 0 0 0
+    END
+  END
+
+END

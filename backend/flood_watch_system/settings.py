@@ -199,5 +199,8 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
 }
+# In settings.py
+MAPSERVER_RASTER_DIR = os.path.join(BASE_DIR, 'mapserver', 'data', 'rasters')
+
 
 SITE_ID = 1

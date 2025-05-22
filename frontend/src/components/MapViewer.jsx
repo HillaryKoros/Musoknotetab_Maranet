@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -8,7 +9,7 @@ import {
   GeoJSON,
   Popup,
 } from "react-leaflet";
-import { ListGroup, Nav, Tab } from "react-bootstrap";
+import { ListGroup, Nav, Tab, Modal, Button } from "react-bootstrap";
 import "leaflet/dist/leaflet.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 import L from "leaflet";
@@ -18,7 +19,7 @@ import { DischargeChart, GeoSFMChart } from "../utils/chartUtils.jsx";
 const MAP_CONFIG = {
   initialPosition: [4.6818, 34.9911],
   initialZoom: 5,
-  geoserverWMSUrl: `http://197.254.1.10:8093/geoserver/floodwatch/wms`,
+  mapserverWMSUrl: `http://localhost:8093/cgi-bin/mapserv?map=/mapfiles/master.map`,
   getFeatureInfoFormat: "application/json",
 };
 
@@ -53,11 +54,190 @@ const GEOFSM_CONFIG = {
   },
 };
 
+// Metadata for layers
+const LAYER_METADATA = {
+  'FloodProofs East Africa': {
+    description: 'FloodProof East Africa provides near real-time flood monitoring and early warning systems for East African countries.',
+    details: [
+      'Integrates satellite data with ground observations for accurate flood detection.',
+      'Provides historical flood data and predictive modeling for flood-prone areas.'
+    ],
+    source: 'ICPAC Flood Monitoring System'
+  },
+  'GeoSFM': {
+    description: 'GeoSFM (Geospatial Stream Flow Model) is a hydrological modeling system used for flood forecasting.',
+    details: [
+      'Uses satellite precipitation data to predict river flow and flooding.',
+      'Provides early warning of potential flooding events.'
+    ],
+    source: 'USGS and NASA Earth Observation Systems'
+  },
+  'Mike Hydro': {
+    description: 'Mike Hydro provides comprehensive hydrological modeling for water resource management.',
+    details: [
+      'Simulates river dynamics, flooding, and water quality.',
+      'Supports watershed management and flood mitigation planning.'
+    ],
+    source: 'DHI Group'
+  },
+  'Fast Flood': {
+    description: 'Fast Flood delivers rapid flood detection and monitoring using satellite imagery.',
+    details: [
+      'Provides near real-time flood extent mapping.',
+      'Uses synthetic aperture radar for cloud-penetrating observations.'
+    ],
+    source: 'Regional Remote Sensing Center'
+  },
+  'Glofas': {
+    description: 'Glofas (Global Flood Awareness System) provides global flood forecasting and monitoring.',
+    details: [
+      'Offers medium-range flood forecasts up to 30 days in advance.',
+      'Provides probabilistic flood predictions.'
+    ],
+    source: 'European Commission Joint Research Centre'
+  },
+  'Inundation Map': {
+    description: 'The Inundation Map shows areas currently under water due to flooding.',
+    details: [
+      'Based on satellite data updated daily.',
+      'Shows water extent and depth information.'
+    ],
+    source: 'ICPAC Satellite Observation System'
+  },
+  'Alerts Map': {
+    description: 'The Alerts Map shows areas with active flood warnings and alerts.',
+    details: [
+      'Displays different alert levels based on severity.',
+      'Incorporates weather forecasts and hydrological data.',
+      'Supports early warning and evacuation planning.'
+    ],
+    source: 'Regional Meteorological Services'
+  },
+  'Affected Population': {
+    description: 'Displays an estimate of population impacted by current or predicted flooding.',
+    details: [
+      'Based on population density data overlaid with flood extents.',
+      'Provides estimates at different administrative levels.',
+      'Helps prioritize humanitarian response.',
+      'Updated as flood conditions change.'
+    ],
+    source: 'ICPAC Impact Analysis'
+  },
+  'Affected GDP': {
+    description: 'Shows economic impact of flooding in terms of GDP affected.',
+    details: [
+      'Combines flood extent with economic activity data.',
+      'Helps quantify economic losses.',
+      'Supports disaster recovery planning.',
+      'Useful for long-term resilience planning.'
+    ],
+    source: 'Economic Impact Assessment Unit'
+  },
+  'Affected Crops': {
+    description: 'Displays agricultural areas impacted by flooding.',
+    details: [
+      'Combines flood data with crop distribution maps.',
+      'Helps estimate agricultural losses.',
+      'Supports food security planning.',
+      'Identifies areas for agricultural assistance.'
+    ],
+    source: 'Agricultural Monitoring System'
+  },
+  'Affected Roads': {
+    description: 'Shows roads and transportation infrastructure impacted by flooding.',
+    details: [
+      'Highlights impassable road sections.',
+      'Supports logistics and supply chain planning.',
+      'Helps identify isolated communities.',
+      'Updated regularly based on field reports and satellite data.'
+    ],
+    source: 'Infrastructure Monitoring System'
+  },
+  'Displaced Population': {
+    description: 'Estimates of people displaced from their homes due to flooding.',
+    details: [
+      'Shows likely displacement patterns based on flood severity.',
+      'Helps plan shelter and humanitarian assistance.',
+      'Indicates pressure points for emergency services.',
+      'Based on historical displacement patterns and current conditions.'
+    ],
+    source: 'Displacement Tracking Matrix'
+  },
+  'Affected Livestock': {
+    description: 'Shows livestock populations at risk from flooding.',
+    details: [
+      'Based on livestock distribution data and flood extents.',
+      'Helps plan veterinary services and feed distribution.',
+      'Supports pastoralist community assistance.',
+      'Identifies areas for livestock evacuation.'
+    ],
+    source: 'Livestock Information System'
+  },
+  'Affected Grazing Land': {
+    description: 'Displays grazing areas impacted by flooding.',
+    details: [
+      'Shows pasture and rangeland under water.',
+      'Helps forecast potential livestock movements.',
+      'Supports planning for alternative grazing arrangements.',
+      'Identifies areas for feed distribution.'
+    ],
+    source: 'Rangeland Monitoring System'
+  },
+  'Lakes': {
+    description: 'Display of major lakes and water bodies in the region.',
+    details: [
+      'Shows natural and artificial lakes.',
+      'Helps understand water distribution and flood patterns.',
+      'Important reference for flood impact analysis.'
+    ],
+    source: 'Regional Water Resources Department'
+  },
+  'Rivers': {
+    description: 'Network of major rivers and tributaries in the region.',
+    details: [
+      'Shows main watercourses and drainage patterns.',
+      'Critical for understanding flood pathways.',
+      'Helps predict areas at risk of flooding.'
+    ],
+    source: 'Regional Hydrological Database'
+  },
+  'Basins': {
+    description: 'Watershed basins showing major drainage regions.',
+    details: [
+      'Depicts hydrological catchment areas.',
+      'Important for watershed management.',
+      'Helps understand flood propagation across regions.'
+    ],
+    source: 'Regional Water Resources Management'
+  },
+  'Admin 1': {
+    description: 'Administrative boundaries at the first level.',
+    details: [
+      'Shows primary administrative divisions.',
+      'Used for regional planning and coordination.',
+      'Helps organize disaster response efforts.'
+    ],
+    source: 'National Geographic Information Systems'
+  },
+  'Admin 2': {
+    description: 'Administrative boundaries at the second level.',
+    details: [
+      'Shows more detailed administrative subdivisions.',
+      'Useful for local planning and targeted response.',
+      'Enables more granular analysis of flood impacts.'
+    ],
+    source: 'National Geographic Information Systems'
+  }
+};
+
 // Utility function to create WMS layer objects
-const createWMSLayer = (name, layerId) => ({
+const createWMSLayer = (name, layerId, isMapServer = false) => ({
   name,
-  layer: `floodwatch:${layerId}`,
-  legend: `${MAP_CONFIG.geoserverWMSUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=floodwatch:${layerId}`,
+  layer: isMapServer ? layerId : `floodwatch:${layerId}`,
+  legend: isMapServer 
+    ? `${MAP_CONFIG.mapserverWMSUrl}&REQUEST=GetLegendGraphic&VERSION=1.3.0&FORMAT=image/png&LAYER=${layerId}`
+    : `${MAP_CONFIG.geoserverWMSUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=floodwatch:${layerId}`,
+  isMapServer,
 });
 
 // Utility function to generate a date string for flood hazard layers
@@ -66,22 +246,29 @@ const getFloodHazardDate = () =>
 
 // Layer definitions
 const HAZARD_LAYERS = [
-  createWMSLayer("Inundation Map", `flood_hazard_${getFloodHazardDate()}`),
-  createWMSLayer("Alerts Map", "Alerts"),
+  createWMSLayer("Inundation Map", `flood_hazard_${getFloodHazardDate()}`, true),
+  createWMSLayer("Hazards Map", "Alerts", true),
 ];
+
 const IMPACT_LAYERS = [
-  createWMSLayer("Affected Population", "Impact_affectedpopulation"),
-  createWMSLayer("Affected GDP", "Impact_impactedgdp"),
-  createWMSLayer("Affected Crops", "Impact_affectedcrops"),
-  createWMSLayer("Affected Roads", "Impact_affectedroads"),
-  createWMSLayer("Displaced Population", "Impact_displacedpopulation"),
-  createWMSLayer("Affected Livestock", "Impact_affectedlivestock"),
-  createWMSLayer("Affected Grazing Land", "Impact_affectedgrazingland"),
+  createWMSLayer("Affected Population", "Impact_affectedpopulation", true),
+  createWMSLayer("Affected GDP", "Impact_impactedgdp", true),
+  createWMSLayer("Affected Crops", "Impact_affectedcrops", true),
+  createWMSLayer("Affected Roads", "Impact_affectedroads", true),
+  createWMSLayer("Displaced Population", "Impact_displacedpopulation", true),
+  createWMSLayer("Affected Livestock", "Impact_affectedlivestock", true),
+  createWMSLayer("Affected Grazing Land", "Impact_affectedgrazingland", true),
 ];
+
+// Updated boundary layers to use MapServer
 const BOUNDARY_LAYERS = [
-  createWMSLayer("Admin 1", "Impact_admin1"),
-  createWMSLayer("Admin 2", "gha_admin2"),
+  createWMSLayer("Admin 1", "admin_level_1", true),
+  createWMSLayer("Admin 2", "admin2", true),
+  createWMSLayer("Lakes", "lakes", true),
+  createWMSLayer("Rivers", "rivers", true),
+  createWMSLayer("Basins", "basins", true),
 ];
+
 const BASE_MAPS = [
   {
     name: "ICPAC",
@@ -105,279 +292,76 @@ const BASE_MAPS = [
   },
 ];
 
+// Info icon component
+const InfoIcon = ({ layerName, onClick }) => (
+  <span 
+    className="info-icon" 
+    onClick={(e) => {
+      e.stopPropagation();
+      onClick(layerName);
+    }}
+  >
+    i
+  </span>
+);
+
+// Component to display metadata modal
+const MetadataModal = ({ show, handleClose, metadata }) => {
+  if (!metadata) return null;
+  
+  return (
+    <Modal show={show} onHide={handleClose} size="lg" centered>
+      <Modal.Header closeButton className="bg-light">
+        <Modal.Title style={{ color: "#1B6840" }}>{metadata.title}</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <p>{metadata.description}</p>
+        <ul className="mb-3">
+          {metadata.details.map((detail, index) => (
+            <li key={index}>{detail}</li>
+          ))}
+        </ul>
+        <p><strong>Source:</strong> {metadata.source}</p>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={handleClose}>
+          Close
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+};
+
 // Component to render a layer selector with checkboxes
-const LayerSelector = ({ title, layers, selectedLayers, onLayerSelect }) => (
+const LayerSelector = ({ title, layers, selectedLayers, onLayerSelect, onInfoClick }) => (
   <div className="layers-section">
     <h6>{title}</h6>
     <ListGroup className="layer-selector">
       {layers.map((layer) => (
         <ListGroup.Item key={layer.name}>
-          <div className="toggle-switch-small">
-            <input
-              type="checkbox"
-              id={`layer-${layer.name}`}
-              checked={selectedLayers.has(layer.layer)}
-              onChange={() => onLayerSelect(layer)}
-            />
-            <label
-              htmlFor={`layer-${layer.name}`}
-              className="toggle-slider-small"
-            ></label>
+          <div className="layer-content">
+            <div className="toggle-switch-small">
+              <input
+                type="checkbox"
+                id={`layer-${layer.name}`}
+                checked={selectedLayers.has(layer.layer)}
+                onChange={() => onLayerSelect(layer)}
+              />
+              <label
+                htmlFor={`layer-${layer.name}`}
+                className="toggle-slider-small"
+              ></label>
+            </div>
+            <label htmlFor={`layer-${layer.name}`} className="layer-label">
+              {layer.name}
+            </label>
           </div>
-          <label htmlFor={`layer-${layer.name}`} className="layer-label">
-            {layer.name}
-          </label>
+          <InfoIcon layerName={layer.name} onClick={onInfoClick} />
         </ListGroup.Item>
       ))}
     </ListGroup>
   </div>
 );
-
-// Component for the sidebar with tabs
-const TabSidebar = ({
-  hazardLayers,
-  impactLayers,
-  selectedLayers,
-  onLayerSelect,
-  showMonitoringStations,
-  setShowMonitoringStations,
-  showGeoFSM,
-  setShowGeoFSM,
-  selectedStation,
-  selectedYear,
-  setSelectedYear,
-  availableYears,
-  showMikeHydro,
-  setShowMikeHydro,
-  showFastFlood,
-  setShowFastFlood,
-  showGlofas,
-  setShowGlofas,
-}) => (
-  <div className="sidebar">
-    <Tab.Container defaultActiveKey="forecast">
-      <Nav variant="tabs" className="sidebar-tabs">
-        <Nav.Item>
-          <Nav.Link eventKey="forecast" className="tab-link">
-            Sector Layers
-          </Nav.Link>
-        </Nav.Item>
-        <Nav.Item>
-          <Nav.Link eventKey="monitoring" className="tab-link">
-            Impact Layers
-          </Nav.Link>
-        </Nav.Item>
-      </Nav>
-      <Tab.Content>
-        <Tab.Pane eventKey="forecast" className="tab-pane">
-          <h4>Station Information</h4>
-          <ListGroup className="mb-4">
-            <ListGroup.Item>
-              <div className="toggle-switch-small">
-                <input
-                  type="checkbox"
-                  id="monitoring-stations-toggle"
-                  checked={showMonitoringStations}
-                  onChange={() => setShowMonitoringStations((prev) => !prev)}
-                />
-                <label
-                  htmlFor="monitoring-stations-toggle"
-                  className="toggle-slider-small"
-                ></label>
-              </div>
-              <label htmlFor="monitoring-stations-toggle">
-                FloodProofs East Africa
-              </label>
-            </ListGroup.Item>
-            <ListGroup.Item>
-              <div className="toggle-switch-small">
-                <input
-                  type="checkbox"
-                  id="geofsm-toggle"
-                  checked={showGeoFSM}
-                  onChange={() => setShowGeoFSM((prev) => !prev)}
-                />
-                <label
-                  htmlFor="geofsm-toggle"
-                  className="toggle-slider-small"
-                ></label>
-              </div>
-              <label htmlFor="geofsm-toggle">GeoSFM</label>
-              {showGeoFSM && (
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  className="form-select mt-2"
-                  style={{ fontSize: "14px" }}
-                >
-                  {availableYears.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </ListGroup.Item>
-            <ListGroup.Item>
-              <div className="toggle-switch-small">
-                <input
-                  type="checkbox"
-                  id="mike-hydro-toggle"
-                  checked={showMikeHydro}
-                  onChange={() => setShowMikeHydro(!showMikeHydro)}
-                />
-                <label
-                  htmlFor="mike-hydro-toggle"
-                  className="toggle-slider-small"
-                ></label>
-              </div>
-              <label htmlFor="mike-hydro-toggle">
-                Mike Hydro
-              </label>
-            </ListGroup.Item>
-            <ListGroup.Item>
-              <div className="toggle-switch-small">
-                <input
-                  type="checkbox"
-                  id="fast-flood-toggle"
-                  checked={showFastFlood}
-                  onChange={() => setShowFastFlood(!showFastFlood)}
-                />
-                <label
-                  htmlFor="fast-flood-toggle"
-                  className="toggle-slider-small"
-                ></label>
-              </div>
-              <label htmlFor="fast-flood-toggle">
-                Fast Flood
-              </label>
-            </ListGroup.Item>
-            <ListGroup.Item>
-              <div className="toggle-switch-small">
-                <input
-                  type="checkbox"
-                  id="glofas-toggle"
-                  checked={showGlofas}
-                  onChange={() => setShowGlofas(!showGlofas)}
-                />
-                <label
-                  htmlFor="glofas-toggle"
-                  className="toggle-slider-small"
-                ></label>
-              </div>
-              <label htmlFor="glofas-toggle">
-                Glofas
-              </label>
-            </ListGroup.Item>
-          </ListGroup>
-          {selectedStation && (
-            <div className="station-characteristics">
-              <h5>{selectedStation.properties?.SEC_NAME}</h5>
-              <div className="characteristics-grid">
-                <div className="characteristic-item">
-                  <span className="characteristic-label">Basin:</span>
-                  <span className="characteristic-value">
-                    {selectedStation.properties?.BASIN}
-                  </span>
-                </div>
-                <div className="characteristic-item">
-                  <span className="characteristic-label">Area:</span>
-                  <span className="characteristic-value">
-                    {selectedStation.properties?.AREA} km²
-                  </span>
-                </div>
-                <div className="characteristic-item">
-                  <span className="characteristic-label">Location:</span>
-                  <span className="characteristic-value">
-                    {selectedStation.properties?.latitude?.toFixed(4)}°N,{" "}
-                    {selectedStation.properties?.longitude?.toFixed(4)}°E
-                  </span>
-                </div>
-                <div className="characteristic-item">
-                  <span className="characteristic-label">Alert Threshold:</span>
-                  <span className="characteristic-value alert-threshold">
-                    {selectedStation.properties?.Q_THR1} m³/s
-                  </span>
-                </div>
-                <div className="characteristic-item">
-                  <span className="characteristic-label">Alarm Threshold:</span>
-                  <span className="characteristic-value alarm-threshold">
-                    {selectedStation.properties?.Q_THR2} m³/s
-                  </span>
-                </div>
-                <div className="characteristic-item">
-                  <span className="characteristic-label">
-                    Emergency Threshold:
-                  </span>
-                  <span className="characteristic-value emergency-threshold">
-                    {selectedStation.properties?.Q_THR3} m³/s
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-        </Tab.Pane>
-        <Tab.Pane eventKey="monitoring" className="tab-pane">
-          <LayerSelector
-            title="Inundation Map"
-            layers={hazardLayers}
-            selectedLayers={selectedLayers}
-            onLayerSelect={onLayerSelect}
-          />
-          <LayerSelector
-            title="Impact Layers"
-            layers={impactLayers}
-            selectedLayers={selectedLayers}
-            onLayerSelect={onLayerSelect}
-          />
-        </Tab.Pane>
-      </Tab.Content>
-    </Tab.Container>
-  </div>
-);
-
-// Component to handle WMS GetFeatureInfo requests on map click
-const FeatureInfoHandler = ({ map, selectedLayers, onFeatureInfo }) => {
-  useMapEvents({
-    click: async (e) => {
-      if (!map || selectedLayers.size === 0) return;
-      const point = map.latLngToContainerPoint(e.latlng);
-      const size = map.getSize();
-      const bounds = map.getBounds();
-      const layersArray = Array.from(selectedLayers);
-      const params = new URLSearchParams({
-        SERVICE: "WMS",
-        VERSION: "1.1.1",
-        REQUEST: "GetFeatureInfo",
-        QUERY_LAYERS: layersArray.join(","),
-        LAYERS: layersArray.join(","),
-        INFO_FORMAT: MAP_CONFIG.getFeatureInfoFormat,
-        X: Math.round(point.x),
-        Y: Math.round(point.y),
-        WIDTH: size.x,
-        HEIGHT: size.y,
-        BBOX: `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`,
-        SRS: "EPSG:4326",
-        FEATURE_COUNT: 10,
-      });
-
-      try {
-        const response = await fetch(`${MAP_CONFIG.geoserverWMSUrl}?${params}`);
-        if (!response.ok)
-          throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-        if (data?.features?.length > 0) {
-          onFeatureInfo(
-            data.features.map((feature) => ({ feature, position: e.latlng })),
-          );
-        }
-      } catch (error) {
-        console.error("Error fetching feature info:", error);
-      }
-    },
-  });
-  return null;
-};
 
 // Component to render map legends
 const MapLegend = ({ legendUrl, title }) => {
@@ -439,6 +423,291 @@ const MapLegend = ({ legendUrl, title }) => {
   ) : null;
 };
 
+// Component for the sidebar with tabs
+const TabSidebar = ({
+  hazardLayers,
+  impactLayers,
+  boundaryLayers,
+  selectedLayers,
+  selectedBoundaryLayers,
+  onLayerSelect,
+  onBoundaryLayerSelect,
+  showMonitoringStations,
+  setShowMonitoringStations,
+  showGeoFSM,
+  setShowGeoFSM,
+  selectedStation,
+  selectedYear,
+  setSelectedYear,
+  availableYears,
+  showMikeHydro,
+  setShowMikeHydro,
+  showFastFlood,
+  setShowFastFlood,
+  showGlofas,
+  setShowGlofas,
+  onInfoClick,
+}) => (
+  <div className="sidebar">
+    <Tab.Container defaultActiveKey="forecast">
+      <Nav variant="tabs" className="sidebar-tabs">
+        <Nav.Item>
+          <Nav.Link eventKey="forecast" className="tab-link">
+            Sector Layers
+          </Nav.Link>
+        </Nav.Item>
+        <Nav.Item>
+          <Nav.Link eventKey="monitoring" className="tab-link">
+            Impact Layers
+          </Nav.Link>
+        </Nav.Item>
+      </Nav>
+      <Tab.Content>
+        <Tab.Pane eventKey="forecast" className="tab-pane">
+          <h4>Station Information</h4>
+          <h4>Station Information</h4>
+          <ListGroup className="mb-4">
+            <ListGroup.Item>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div className="layer-content">
+                  <div className="toggle-switch-small">
+                    <input
+                      type="checkbox"
+                      id="monitoring-stations-toggle"
+                      checked={showMonitoringStations}
+                      onChange={() => setShowMonitoringStations((prev) => !prev)}
+                    />
+                    <label
+                      htmlFor="monitoring-stations-toggle"
+                      className="toggle-slider-small"
+                    ></label>
+                  </div>
+                  <label htmlFor="monitoring-stations-toggle">
+                    FloodProofs East Africa
+                  </label>
+                </div>
+                <InfoIcon layerName="FloodProofs East Africa" onClick={onInfoClick} />
+              </div>
+            </ListGroup.Item>
+            <ListGroup.Item>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div className="layer-content">
+                    <div className="toggle-switch-small">
+                      <input
+                        type="checkbox"
+                        id="geofsm-toggle"
+                        checked={showGeoFSM}
+                        onChange={() => setShowGeoFSM((prev) => !prev)}
+                      />
+                      <label
+                        htmlFor="geofsm-toggle"
+                        className="toggle-slider-small"
+                      ></label>
+                    </div>
+                    <label htmlFor="geofsm-toggle">GeoSFM</label>
+                  </div>
+                  <InfoIcon layerName="GeoSFM" onClick={onInfoClick} />
+                </div>
+                {showGeoFSM && (
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                    className="form-select mt-2"
+                    style={{ fontSize: "14px", marginLeft: "38px" }}
+                  >
+                    {availableYears.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </ListGroup.Item>
+            <ListGroup.Item>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div className="layer-content">
+                  <div className="toggle-switch-small">
+                    <input
+                      type="checkbox"
+                      id="mike-hydro-toggle"
+                      checked={showMikeHydro}
+                      onChange={() => setShowMikeHydro(!showMikeHydro)}
+                    />
+                    <label
+                      htmlFor="mike-hydro-toggle"
+                      className="toggle-slider-small"
+                    ></label>
+                  </div>
+                  <label htmlFor="mike-hydro-toggle">
+                    Mike Hydro
+                  </label>
+                </div>
+                <InfoIcon layerName="Mike Hydro" onClick={onInfoClick} />
+              </div>
+            </ListGroup.Item>
+            <ListGroup.Item>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div className="layer-content">
+                  <div className="toggle-switch-small">
+                    <input
+                      type="checkbox"
+                      id="fast-flood-toggle"
+                      checked={showFastFlood}
+                      onChange={() => setShowFastFlood(!showFastFlood)}
+                    />
+                    <label
+                      htmlFor="fast-flood-toggle"
+                      className="toggle-slider-small"
+                    ></label>
+                  </div>
+                  <label htmlFor="fast-flood-toggle">
+                    Fast Flood
+                  </label>
+                </div>
+                <InfoIcon layerName="Fast Flood" onClick={onInfoClick} />
+              </div>
+            </ListGroup.Item>
+            <ListGroup.Item>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div className="layer-content">
+                  <div className="toggle-switch-small">
+                    <input
+                      type="checkbox"
+                      id="glofas-toggle"
+                      checked={showGlofas}
+                      onChange={() => setShowGlofas(!showGlofas)}
+                    />
+                    <label
+                      htmlFor="glofas-toggle"
+                      className="toggle-slider-small"
+                    ></label>
+                  </div>
+                  <label htmlFor="glofas-toggle">
+                    Glofas
+                  </label>
+                </div>
+                <InfoIcon layerName="Glofas" onClick={onInfoClick} />
+              </div>
+            </ListGroup.Item>
+          </ListGroup>
+          {selectedStation && (
+            <div className="station-characteristics">
+              <h5>{selectedStation.properties?.SEC_NAME}</h5>
+              <div className="characteristics-grid">
+                <div className="characteristic-item">
+                  <span className="characteristic-label">Basin:</span>
+                  <span className="characteristic-value">
+                    {selectedStation.properties?.BASIN}
+                  </span>
+                </div>
+                <div className="characteristic-item">
+                  <span className="characteristic-label">Area:</span>
+                  <span className="characteristic-value">
+                    {selectedStation.properties?.AREA} km²
+                  </span>
+                </div>
+                <div className="characteristic-item">
+                  <span className="characteristic-label">Location:</span>
+                  <span className="characteristic-value">
+                    {selectedStation.properties?.latitude?.toFixed(4)}°N,{" "}
+                    {selectedStation.properties?.longitude?.toFixed(4)}°E
+                  </span>
+                </div>
+                <div className="characteristic-item">
+                  <span className="characteristic-label">Alert Threshold:</span>
+                  <span className="characteristic-value alert-threshold">
+                    {selectedStation.properties?.Q_THR1} m³/s
+                  </span>
+                </div>
+                <div className="characteristic-item">
+                  <span className="characteristic-label">Alarm Threshold:</span>
+                  <span className="characteristic-value alarm-threshold">
+                    {selectedStation.properties?.Q_THR2} m³/s
+                  </span>
+                </div>
+                <div className="characteristic-item">
+                  <span className="characteristic-label">
+                    Emergency Threshold:
+                  </span>
+                  <span className="characteristic-value emergency-threshold">
+                    {selectedStation.properties?.Q_THR3} m³/s
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </Tab.Pane>
+        <Tab.Pane eventKey="monitoring" className="tab-pane">
+          <LayerSelector
+            title="Inundation Map"
+            layers={hazardLayers}
+            selectedLayers={selectedLayers}
+            onLayerSelect={onLayerSelect}
+            onInfoClick={onInfoClick}
+          />
+          <LayerSelector
+            title="Impact Layers"
+            layers={impactLayers}
+            selectedLayers={selectedLayers}
+            onLayerSelect={onLayerSelect}
+            onInfoClick={onInfoClick}
+          />
+        </Tab.Pane>
+      </Tab.Content>
+    </Tab.Container>
+  </div>
+);
+
+const FeatureInfoHandler = ({ map, selectedLayers, selectedBoundaryLayers, onFeatureInfo }) => {
+  useMapEvents({
+    click: async (e) => {
+      if (!map || (selectedLayers.size === 0 && selectedBoundaryLayers.size === 0)) return;
+      
+      const point = map.latLngToContainerPoint(e.latlng);
+      const size = map.getSize();
+      const bounds = map.getBounds();
+      
+      // Handle all layers (both hazard/impact and boundary) with MapServer
+      const allLayersArray = [...Array.from(selectedLayers), ...Array.from(selectedBoundaryLayers)];
+      
+      if (allLayersArray.length > 0) {
+        const params = new URLSearchParams({
+          SERVICE: "WMS",
+          VERSION: "1.3.0",
+          REQUEST: "GetFeatureInfo",
+          QUERY_LAYERS: allLayersArray.join(","),
+          LAYERS: allLayersArray.join(","),
+          INFO_FORMAT: MAP_CONFIG.getFeatureInfoFormat,
+          I: Math.round(point.x),
+          J: Math.round(point.y),
+          WIDTH: size.x,
+          HEIGHT: size.y,
+          BBOX: `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`,
+          CRS: "EPSG:4326",
+          FEATURE_COUNT: 10,
+        });
+
+        try {
+          const response = await fetch(`${MAP_CONFIG.mapserverWMSUrl}&${params}`);
+          if (!response.ok)
+            throw new Error(`HTTP error! status: ${response.status}`);
+          const data = await response.json();
+          if (data?.features?.length > 0) {
+            onFeatureInfo(
+              data.features.map((feature) => ({ feature, position: e.latlng })),
+            );
+          }
+        } catch (error) {
+          console.error("Error fetching feature info from MapServer:", error);
+        }
+      }
+    },
+  });
+  return null;
+};
+
 // Custom WMS layer component for stable loading
 const StableWMSLayer = React.memo(({ url, layers, transparent = true, format = "image/png", version = "1.1.1" }) => {
   const [key, setKey] = useState(0);
@@ -469,15 +738,21 @@ const MapViewer = () => {
   const [map, setMap] = useState(null);
   const [selectedLayers, setSelectedLayers] = useState(new Set());
   const [isSidebarActive, setIsSidebarActive] = useState(true);
-  // Admin 1 is always visible by default with stable loading
-  const [adminLayerLoaded, setAdminLayerLoaded] = useState(false);
-  const [selectedBoundaryLayers, setSelectedBoundaryLayers] = useState(new Set(['floodwatch:Impact_admin1']));
+  const [selectedBoundaryLayers, setSelectedBoundaryLayers] = useState(new Set([
+    'admin_level_1',
+    'lakes'  // Added lakes to load by default
+  ]));
   const [activeLegend, setActiveLegend] = useState(null);
+  // Track screen size for responsive design
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   // Track screen size for responsive design
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [mapKey, setMapKey] = useState(0);
   const [showMonitoringStations, setShowMonitoringStations] = useState(false);
   const [showGeoFSM, setShowGeoFSM] = useState(false);
+  const [showMikeHydro, setShowMikeHydro] = useState(false);
+  const [showFastFlood, setShowFastFlood] = useState(false);
+  const [showGlofas, setShowGlofas] = useState(false);
   const [showMikeHydro, setShowMikeHydro] = useState(false);
   const [showFastFlood, setShowFastFlood] = useState(false);
   const [showGlofas, setShowGlofas] = useState(false);
@@ -496,8 +771,28 @@ const MapViewer = () => {
   const [featurePopups, setFeaturePopups] = useState([]);
   const [isLayerControlVisible, setIsLayerControlVisible] = useState(false);
   
-  // Use ref to prevent duplicate admin layer loads
-  const adminLayerRef = useRef(null);
+  // State for metadata modal
+  const [showMetadataModal, setShowMetadataModal] = useState(false);
+  const [currentMetadata, setCurrentMetadata] = useState(null);
+
+  // Handler for info icon clicks
+  const handleInfoClick = (layerName) => {
+    const metadata = LAYER_METADATA[layerName] || {
+      title: layerName,
+      description: `Metadata for ${layerName}`,
+      details: ["Detailed information not available"],
+      source: "East Africa Flood Watch"
+    };
+    
+    metadata.title = layerName;
+    setCurrentMetadata(metadata);
+    setShowMetadataModal(true);
+  };
+
+  // Handler for closing metadata modal
+  const handleCloseMetadata = () => {
+    setShowMetadataModal(false);
+  };
 
   // Function to fetch GeoJSON data
   const fetchMonitoringData = useCallback(() => {
@@ -517,16 +812,16 @@ const MapViewer = () => {
       })
       .catch((error) => {
         console.error("Error loading monitoring data:", error);
-        setMonitoringData(null); // Reset on error
+        setMonitoringData(null);
       });
   }, []);
 
   // Fetch monitoring data when toggled on and periodically
   useEffect(() => {
     if (showMonitoringStations) {
-      fetchMonitoringData(); // Initial fetch
-      const interval = setInterval(fetchMonitoringData, 60000); // Refresh every 60 seconds
-      return () => clearInterval(interval); // Cleanup on unmount or toggle off
+      fetchMonitoringData();
+      const interval = setInterval(fetchMonitoringData, 60000);
+      return () => clearInterval(interval);
     } else {
       setMonitoringData(null);
       setTimeSeriesData([]);
@@ -653,10 +948,21 @@ const MapViewer = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
   
+
+  // Handle window resize for mobile responsiveness
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
   const handleBoundaryLayerSelection = useCallback(
     (layer) => {
       // Admin 1 remains always selected for stability
-      if (layer.layer === 'floodwatch:Impact_admin1') {
+      if (layer.layer === 'admin_level_1') {
         return; // Don't allow deselecting Admin1
       }
       
@@ -775,20 +1081,25 @@ const MapViewer = () => {
 
   return (
     <div className={`map-viewer ${isMobile ? 'mobile-view' : ''}`}>
-      <button 
-        className={`toggle-sidebar-btn ${isMobile ? 'mobile-toggle' : ''}`} 
-        onClick={toggleSidebar}
-        aria-label={isSidebarActive ? "Close sidebar" : "Open sidebar"}
-      >
-        {isSidebarActive ? "✕" : "☰"}
-      </button>
+      {isMobile && (
+        <button 
+          className="toggle-sidebar-btn mobile-toggle" 
+          onClick={toggleSidebar}
+          aria-label={isSidebarActive ? "Close layers" : "Open layers"}
+        >
+          {isSidebarActive ? "×" : "☰"}
+        </button>
+      )}
       <div className={`sidebar ${isSidebarActive ? "active" : ""} ${isMobile ? 'mobile-sidebar' : ''}`}>
         <TabSidebar
           hazardLayers={HAZARD_LAYERS}
           impactLayers={IMPACT_LAYERS}
           boundaryLayers={BOUNDARY_LAYERS}
+          boundaryLayers={BOUNDARY_LAYERS}
           selectedLayers={selectedLayers}
+          selectedBoundaryLayers={selectedBoundaryLayers}
           onLayerSelect={handleLayerSelection}
+          onBoundaryLayerSelect={handleBoundaryLayerSelection}
           showMonitoringStations={showMonitoringStations}
           setShowMonitoringStations={setShowMonitoringStations}
           showGeoFSM={showGeoFSM}
@@ -803,8 +1114,10 @@ const MapViewer = () => {
           setShowFastFlood={setShowFastFlood}
           showGlofas={showGlofas}
           setShowGlofas={setShowGlofas}
+          onInfoClick={handleInfoClick}
         />
       </div>
+      <div className={`main-content ${isMobile ? 'mobile-content' : ''}`}>
       <div className={`main-content ${isMobile ? 'mobile-content' : ''}`}>
         <div className="map-container">
           <MapContainer
@@ -820,40 +1133,31 @@ const MapViewer = () => {
               attribution={BASE_MAPS[0].attribution}
             />
             
-            {/* Admin 1 layer is always loaded by default for stability */}
-            {adminLayerLoaded && (
-              <StableWMSLayer
-                url={MAP_CONFIG.geoserverWMSUrl}
-                layers="floodwatch:Impact_admin1"
-                transparent={true}
-                format="image/png"
-                version="1.1.1"
-              />
-            )}
-            
-            {/* Other selected boundary layers */}
-            {Array.from(selectedBoundaryLayers).filter(layer => layer !== 'floodwatch:Impact_admin1').map((layerId) => (
+            {/* Boundary layers from MapServer WMS */}
+            {Array.from(selectedBoundaryLayers).map((layerId) => (
               <StableWMSLayer
                 key={`boundary-${layerId}`}
-                url={MAP_CONFIG.geoserverWMSUrl}
+                url={MAP_CONFIG.mapserverWMSUrl}
                 layers={layerId}
                 transparent={true}
+                transparent={true}
                 format="image/png"
-                version="1.1.1"
+                version="1.3.0"
               />
             ))}
             
-            {/* Selected impact/hazard layers */}
+            {/* Selected impact/hazard layers from GeoServer */}
             {Array.from(selectedLayers).map((layerId) => (
               <StableWMSLayer
                 key={`layer-${layerId}`}
-                url={MAP_CONFIG.geoserverWMSUrl}
+                url={MAP_CONFIG.mapserverWMSUrl}
                 layers={layerId}
                 transparent={true}
                 format="image/png"
-                version="1.1.1"
+                version="1.3.0"
               />
             ))}
+            
             
             <div
               className="toggle-label"
@@ -884,7 +1188,7 @@ const MapViewer = () => {
                   </LayersControl.BaseLayer>
                 ))}
                 
-                {/* Boundary layers in layer control */}
+                {/* Boundary layers in layer control - now using MapServer */}
                 {BOUNDARY_LAYERS.map((layer) => (
                   <LayersControl.Overlay
                     key={layer.layer}
@@ -892,20 +1196,29 @@ const MapViewer = () => {
                     checked={selectedBoundaryLayers.has(layer.layer)}
                   >
                     <WMSTileLayer
-                      url={MAP_CONFIG.geoserverWMSUrl}
+                      url={MAP_CONFIG.mapserverWMSUrl}
                       layers={layer.layer}
                       format="image/png"
                       transparent={true}
-                      version="1.1.1"
+                      version="1.3.0"
                       eventHandlers={{
-                        add: () => handleBoundaryLayerSelection(layer),
-                        remove: () => handleBoundaryLayerSelection(layer),
+                        add: () => setSelectedBoundaryLayers(prev => new Set([...prev, layer.layer])),
+                        remove: () => {
+                          if (layer.layer !== 'Admin1') {
+                            setSelectedBoundaryLayers(prev => {
+                              const newLayers = new Set(prev);
+                              newLayers.delete(layer.layer);
+                              return newLayers;
+                            });
+                          }
+                        }
                       }}
                     />
                   </LayersControl.Overlay>
                 ))}
               </LayersControl>
             </div>
+            
             
             {showMonitoringStations && monitoringData?.features && (
               <GeoJSON
@@ -956,9 +1269,8 @@ const MapViewer = () => {
             )}
             <FeatureInfoHandler
               map={map}
-              selectedLayers={
-                new Set([...selectedLayers, ...selectedBoundaryLayers])
-              }
+              selectedLayers={selectedLayers}
+              selectedBoundaryLayers={selectedBoundaryLayers}
               onFeatureInfo={handleFeatureInfo}
             />
             {featurePopups.map((popup, index) => (
@@ -996,7 +1308,7 @@ const MapViewer = () => {
           )}
         </div>
         {showChart && (
-          <div className="bottom-panel">
+          <div className={`bottom-panel ${isMobile && isSidebarActive ? 'with-sidebar' : ''}`}>
             <div className="chart-header">
               <h5>
                 {selectedStation?.properties?.SEC_NAME ||
@@ -1065,6 +1377,12 @@ const MapViewer = () => {
           </div>
         )}
       </div>
+      {/* Metadata Modal */}
+      <MetadataModal
+        show={showMetadataModal}
+        handleClose={handleCloseMetadata}
+        metadata={currentMetadata}
+      />
     </div>
   );
 };

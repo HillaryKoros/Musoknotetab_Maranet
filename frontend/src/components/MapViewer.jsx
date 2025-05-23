@@ -18,7 +18,7 @@ import { DischargeChart, GeoSFMChart } from "../utils/chartUtils.jsx";
 const MAP_CONFIG = {
   initialPosition: [4.6818, 34.9911],
   initialZoom: 5,
-  mapserverWMSUrl: `http://localhost:8093/cgi-bin/mapserv?map=/mapfiles/master.map`,
+  mapserverWMSUrl: `http://10.10.1.13:8093/cgi-bin/mapserv?map=/etc/mapserver/master.map`,
   getFeatureInfoFormat: "application/json",
 };
 
@@ -262,7 +262,7 @@ const IMPACT_LAYERS = [
 // Updated boundary layers to use MapServer
 const BOUNDARY_LAYERS = [
   createWMSLayer("Admin 1", "admin_level_1", true),
-  createWMSLayer("Admin 2", "admin2", true),
+  createWMSLayer("Admin 2", "admin_level_2", true),
   createWMSLayer("Lakes", "lakes", true),
   createWMSLayer("Rivers", "rivers", true),
   createWMSLayer("Basins", "basins", true),
@@ -737,8 +737,9 @@ const MapViewer = () => {
   const [selectedLayers, setSelectedLayers] = useState(new Set());
   const [isSidebarActive, setIsSidebarActive] = useState(true);
   const [selectedBoundaryLayers, setSelectedBoundaryLayers] = useState(new Set([
-    'admin_level_1',
-    'lakes'  // Added lakes to load by default
+    'rivers' ,
+    'admin_level_1'
+     // Added lakes to load by default
   ]));
   const [activeLegend, setActiveLegend] = useState(null);
   // Track screen size for responsive design
@@ -944,7 +945,7 @@ const MapViewer = () => {
   const handleBoundaryLayerSelection = useCallback(
     (layer) => {
       // Admin 1 remains always selected for stability
-      if (layer.layer === 'admin_level_1') {
+      if (layer.layer === 'Admin1') {
         return; // Don't allow deselecting Admin1
       }
       
@@ -1054,13 +1055,6 @@ const MapViewer = () => {
 
   const toggleSidebar = () => setIsSidebarActive(!isSidebarActive);
 
-  // Effect to handle Admin1 layer initialization
-  useEffect(() => {
-    if (map && !adminLayerLoaded) {
-      setAdminLayerLoaded(true);
-    }
-  }, [map, adminLayerLoaded]);
-
   return (
     <div className={`map-viewer ${isMobile ? 'mobile-view' : ''}`}>
       {isMobile && (
@@ -1113,20 +1107,8 @@ const MapViewer = () => {
               attribution={BASE_MAPS[0].attribution}
             />
             
-            {/* Boundary layers from MapServer WMS */}
-            {Array.from(selectedBoundaryLayers).map((layerId) => (
-              <StableWMSLayer
-                key={`boundary-${layerId}`}
-                url={MAP_CONFIG.mapserverWMSUrl}
-                layers={layerId}
-                transparent={true}
-                format="image/png"
-                version="1.3.0"
-              />
-            ))}
-            
-            {/* Selected impact/hazard layers from GeoServer */}
-            {Array.from(selectedLayers).map((layerId) => (
+           {/* 1. First render impact/hazard layers at the bottom */}
+              {Array.from(selectedLayers).map((layerId) => (
               <StableWMSLayer
                 key={`layer-${layerId}`}
                 url={MAP_CONFIG.mapserverWMSUrl}
@@ -1134,8 +1116,62 @@ const MapViewer = () => {
                 transparent={true}
                 format="image/png"
                 version="1.3.0"
+                zIndex={100}
               />
             ))}
+            
+            {/* 2. Then render lakes layer with specific z-index */}
+            {selectedBoundaryLayers.has('lakes') && (
+              <StableWMSLayer
+                key="boundary-lakes"
+                url={MAP_CONFIG.mapserverWMSUrl}
+                layers="lakes"
+                transparent={true}
+                format="image/png"
+                version="1.3.0"
+                zIndex={200}
+              />
+            )}
+            
+            {/* 3. Then render non-admin boundary layers */}
+            {selectedBoundaryLayers.has('rivers') && (
+              <StableWMSLayer
+                key="boundary-rivers"
+                url={MAP_CONFIG.mapserverWMSUrl}
+                layers="rivers"
+                transparent={true}
+                format="image/png"
+                version="1.3.0"
+                zIndex={300}
+              />
+            )}
+            
+            {selectedBoundaryLayers.has('basins') && (
+              <StableWMSLayer
+                key="boundary-basins"
+                url={MAP_CONFIG.mapserverWMSUrl}
+                layers="basins"
+                transparent={true}
+                format="image/png"
+                version="1.3.0"
+                zIndex={350}
+              />
+            )}
+            
+            {/* 4. Admin layers with highest z-index to ensure they're always on top */}
+            {['admin_level_1', 'admin_level_2'].map((adminLayer, index) => 
+              selectedBoundaryLayers.has(adminLayer) && (
+                <StableWMSLayer
+                  key={`boundary-${adminLayer}-top`}
+                  url={MAP_CONFIG.mapserverWMSUrl}
+                  layers={adminLayer}
+                  transparent={true}
+                  format="image/png"
+                  version="1.3.0"
+                  zIndex={400 + index}
+                />
+              )
+            )}
             
             <div
               className="toggle-label"

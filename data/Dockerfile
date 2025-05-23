@@ -1,56 +1,50 @@
-FROM camptocamp/mapserver:7.6
+FROM debian:bullseye-slim
 
-# Set environment variables
-ENV MS_MAPFILE=/etc/mapserver/master.map
-ENV PROJ_LIB=/usr/share/proj
-
-# Install additional dependencies
+# Install dependencies
 RUN apt-get update && apt-get install -y \
-    wget \
-    unzip \
-    curl \
-    gdal-bin \
-    python3-gdal \
     apache2 \
+    cgi-mapserver \
     libapache2-mod-fcgid \
-    && apt-get clean \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure Apache
-RUN a2enmod cgid rewrite fcgid && \
-    echo "ServerName localhost" >> /etc/apache2/apache2.conf && \
-    mkdir -p /var/www/html/ms_tmp/ && \
-    chown -R www-data:www-data /var/www/html/ms_tmp/ && \
-    chmod -R 777 /var/www/html/ms_tmp/
+# Enable CGI and headers modules
+RUN a2enmod cgi headers
 
-# Copy Apache configuration for MapServer
-COPY apache-mapserver.conf /etc/apache2/sites-available/000-default.conf
+# Configure CGI directory
+RUN mkdir -p /usr/lib/cgi-bin/ \
+    && ln -sf /usr/bin/mapserv /usr/lib/cgi-bin/mapserv \
+    && chmod 755 /usr/lib/cgi-bin/mapserv
 
-# Create necessary directories
-RUN mkdir -p /data/shapefiles/admin \
-    && mkdir -p /etc/mapserver/templates
+# Create Apache config
+RUN echo '<VirtualHost *:80>\n\
+    ServerAdmin webmaster@localhost\n\
+    DocumentRoot /var/www/html\n\
+    ErrorLog ${APACHE_LOG_DIR}/error.log\n\
+    CustomLog ${APACHE_LOG_DIR}/access.log combined\n\
+    ScriptAlias /cgi-bin/ /usr/lib/cgi-bin/\n\
+    <Directory "/usr/lib/cgi-bin">\n\
+        AllowOverride None\n\
+        Options +ExecCGI -MultiViews\n\
+        Require all granted\n\
+    </Directory>\n\
+    <Location "/cgi-bin/mapserv">\n\
+        SetEnv MS_MAPFILE /etc/mapserver/master.map\n\
+        Header set Access-Control-Allow-Origin "*"\n\
+    </Location>\n\
+</VirtualHost>' > /etc/apache2/sites-available/000-default.conf
 
-# Create a minimal feature info template
-RUN echo '<html><head><title>Feature Info</title></head><body>[item name=*]</body></html>' > /etc/mapserver/templates/feature_info.html
+# Create health check
+RUN echo '#!/bin/bash\n\
+echo "Content-Type: text/plain"\n\
+echo ""\n\
+echo "OK"' > /usr/lib/cgi-bin/health \
+    && chmod +x /usr/lib/cgi-bin/health
 
-# Create a fonts file (required by MapServer)
-RUN echo "sans /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" > /etc/mapserver/fonts.txt
+# Create directories
+RUN mkdir -p /etc/mapserver /data/geojson
 
-# Create an empty GeoJSON placeholder
-RUN echo '{"type":"FeatureCollection","features":[]}' > /data/shapefiles/admin/empty.geojson
-
-# Set correct permissions
-RUN chmod -R 755 /data /etc/mapserver
-
-# Expose MapServer port
+WORKDIR /etc/mapserver
 EXPOSE 80
 
-# Set the working directory
-WORKDIR /data
-
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD curl --fail http://localhost/cgi-bin/mapserv?map=/etc/mapserver/master.map&SERVICE=WMS&REQUEST=GetCapabilities || exit 1
-
-# Set entrypoint to run Apache
 CMD ["apache2ctl", "-D", "FOREGROUND"]

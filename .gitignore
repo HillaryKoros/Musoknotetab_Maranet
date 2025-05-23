@@ -23,3 +23,8 @@ media/
 Thumbs.db
 
 node_modules/
+
+data/impact_shapefiles/
+data/rasters/
+data/shapefiles/
+data/timeseries_data/

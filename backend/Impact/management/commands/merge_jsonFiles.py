@@ -11,10 +11,6 @@ import tempfile
 class Command(BaseCommand):
     help = 'Download and process remote JSON and shapefile data from an SFTP server.'
 
-    """
-    Constructs the remote SFTP path for JSON data based on a given date.
-    Returns a tuple of (base_path, full_path, base_date).
-    """
     def get_data_path(self, base_date=None):
         if base_date is None:
             base_date = datetime.now()
@@ -29,38 +25,30 @@ class Command(BaseCommand):
         
         return base_path, full_path, base_date
 
-    """
-    Determines the output directory, enforcing the shared volume (/app/shared_data/timeseries_data).
-    Returns a tuple of (directory_path, is_shared_volume_flag).
-    """
     def get_output_dir(self):
-        # Enforce shared volume only
-        shared_dir = '/app/shared_data/timeseries_data'
+        # Use environment variable for timeseries data directory
+        timeseries_dir = config('TIMESERIES_OUTPUT_DIR', default='/etc/mapserver/data/timeseries_data')
         is_shared_volume = True
         
-        if not os.path.exists(shared_dir):
+        if not os.path.exists(timeseries_dir):
             try:
-                os.makedirs(shared_dir)
-                self.stdout.write(self.style.SUCCESS(f"Created shared volume directory: {shared_dir}"))
+                os.makedirs(timeseries_dir)
+                self.stdout.write(self.style.SUCCESS(f"Created timeseries directory: {timeseries_dir}"))
             except Exception as e:
-                raise Exception(f"Could not create {shared_dir}: {e}. Check permissions or volume mounting.")
+                raise Exception(f"Could not create {timeseries_dir}: {e}. Check permissions or volume mounting.")
         
         try:
             # Verify writability
-            test_file = os.path.join(shared_dir, '.write_test')
+            test_file = os.path.join(timeseries_dir, '.write_test')
             with open(test_file, 'w') as f:
                 f.write('test')
             os.remove(test_file)
-            self.stdout.write(self.style.SUCCESS(f"Using writable shared volume: {shared_dir}"))
+            self.stdout.write(self.style.SUCCESS(f"Using writable timeseries directory: {timeseries_dir}"))
         except (IOError, PermissionError) as e:
-            raise Exception(f"Shared volume {shared_dir} not writable: {e}. Ensure permissions and volume are correctly configured.")
+            raise Exception(f"Timeseries directory {timeseries_dir} not writable: {e}. Ensure permissions and volume are correctly configured.")
         
-        return shared_dir, is_shared_volume
+        return timeseries_dir, is_shared_volume
 
-    """
-    Checks if a remote path exists on the SFTP server.
-    Returns True if the path exists, False otherwise.
-    """
     def check_remote_path_exists(self, sftp, path):
         try:
             sftp.stat(path)
@@ -68,10 +56,6 @@ class Command(BaseCommand):
         except IOError:
             return False
 
-    """
-    Finds the most recent valid JSON path on the SFTP server, falling back up to max_retries days.
-    Returns a tuple of (path, date) or (None, None) if no valid path is found.
-    """
     def get_valid_json_path(self, sftp, max_retries=7):
         current_date = datetime.now()
         
@@ -84,16 +68,12 @@ class Command(BaseCommand):
                 
         return None, None
 
-    """
-    Main entry point for the command.
-    Handles the workflow: determines output directory, syncs data, processes it, and saves the result.
-    """
     def handle(self, *args, **kwargs):
         try:
-            # Get the output directory (shared volume only)
+            # Get the output directory
             output_dir, is_shared_volume = self.get_output_dir()
             output_file = os.path.join(output_dir, 'merged_data.geojson')
-            self.stdout.write(self.style.SUCCESS(f"Will save to: {output_file} (Shared volume: {is_shared_volume})"))
+            self.stdout.write(self.style.SUCCESS(f"Will save to: {output_file} (Timeseries directory: {is_shared_volume})"))
             
             # Create temporary directory for processing intermediate files
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -105,17 +85,13 @@ class Command(BaseCommand):
                 # Sync data from SFTP server to temp directory
                 json_files, shapefile_dir = self.sync_data(json_dir, shapefile_dir)
                 
-                # Process and merge data, saving to the shared volume
+                # Process and merge data, saving to the timeseries directory
                 self.process_and_merge_data(json_files, shapefile_dir, output_file)
 
         except Exception as e:
             self.stderr.write(self.style.ERROR(f"Error: {e}"))
             raise
 
-    """
-    Establishes an SFTP connection using credentials from environment variables.
-    Returns an SFTP client object or raises an exception on failure.
-    """
     def connect_sftp(self):
         hostname = config('SFTP_HOST')
         port = int(config('SFTP_PORT'))
@@ -129,10 +105,6 @@ class Command(BaseCommand):
         except Exception as e:
             raise Exception(f"Failed to connect to SFTP server: {e}")
 
-    """
-    Downloads JSON and shapefile data from the SFTP server to temporary local directories.
-    Returns a tuple of (json_files_list, shapefile_dir).
-    """
     def sync_data(self, json_dir, shapefile_dir):
         sftp = self.connect_sftp()
 
@@ -163,10 +135,6 @@ class Command(BaseCommand):
         finally:
             sftp.close()
 
-    """
-    Downloads files with specified extensions from a remote SFTP directory to a local directory.
-    Returns a list of downloaded file paths.
-    """
     def download_files(self, sftp, remote_dir, local_dir, extensions):
         try:
             remote_files = sftp.listdir(remote_dir)
@@ -199,10 +167,6 @@ class Command(BaseCommand):
 
         return downloaded_files
 
-    """
-    Merges JSON data with shapefiles and saves the result as a GeoJSON file to the output location.
-    Handles CRS assignment and data validation.
-    """
     def process_and_merge_data(self, json_files, shapefile_dir, output_file):
         try:
             # Ensure the output directory exists and is writable

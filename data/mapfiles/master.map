@@ -1,0 +1,143 @@
+MAP
+  NAME "FloodWatch"
+  EXTENT -180 -90 180 90
+  UNITS DD
+  SIZE 800 600
+  IMAGECOLOR 255 255 255
+  IMAGETYPE PNG
+  CONFIG "MS_ERRORFILE" "/tmp/mapserver_error.log"
+  DEBUG 5
+  
+  # Define SHAPEPATH to help MapServer find the shapefiles
+  SHAPEPATH "/data/shapefiles"
+  
+  # Web configuration for WMS services
+  #-----------------------------------
+  WEB
+    METADATA
+      "wms_title" "Flood Watch System"
+      "wms_onlineresource" "http://localhost:8093/cgi-bin/mapserv?map=/etc/mapserver/master.map"
+      "wms_srs" "EPSG:4326 EPSG:3857 EPSG:900913"
+      "wms_enable_request" "*"
+    END
+  END
+
+  # Global projection definition
+  #----------------------------
+  PROJECTION
+    "init=epsg:4326"
+  END
+
+  #############################################
+  # ADMINISTRATIVE BOUNDARY LAYERS
+  #############################################
+  
+  # Admin Level 1 - First-level administrative boundaries
+  #-----------------------------------------------------
+  LAYER
+    NAME "admin_level_1"
+    STATUS ON
+    TYPE POLYGON
+    DATA "admin/admin_level_0"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Administrative Boundaries Level 1"
+      "wms_enable_request" "*"
+    END
+    
+    CLASS
+      NAME "Admin Level 1"
+      STYLE
+        OUTLINECOLOR 80 80 80     # Darker grey, closer to black
+        WIDTH 1                   # Width of 1
+        COLOR -1 -1 -1            # Hollow fill (transparent)
+      END
+    END
+  END
+  
+  LAYER
+    NAME "admin_level_2"
+    STATUS ON
+    TYPE POLYGON
+    DATA "admin/admin_level_1"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Administrative Boundaries Level 2"
+      "wms_enable_request" "*"
+    END
+    
+    CLASS
+      NAME "Admin Level 2"
+      STYLE
+        OUTLINECOLOR 160 160 160  # Lighter grey outline
+        WIDTH 1                   # Thinner line
+        COLOR -1 -1 -1            # No fill color
+      END
+    END
+  END
+  
+  #############################################
+  # HYDROLOGICAL LAYERS
+  #############################################
+  
+  # Rivers layer
+  #-------------
+  LAYER
+    NAME "rivers"
+    STATUS ON
+    TYPE LINE
+    DATA "admin/rivers"  # Path to the rivers shapefile (without .shp extension)
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Rivers"
+      "wms_enable_request" "*"
+    END
+    
+    CLASS
+      NAME "Rivers"
+      STYLE
+        COLOR 0 128 255       # Blue lines
+        WIDTH 1               # Line width
+      END
+    END
+  END
+  
+  # Lakes layer
+  #------------
+  LAYER
+    NAME "lakes"
+    STATUS ON
+    TYPE POLYGON
+    DATA "admin/lakes"  # Path to the lakes shapefile (without .shp extension)
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Lakes"
+      "wms_enable_request" "*"
+    END
+    
+    CLASS
+      NAME "Lakes"
+      STYLE
+        COLOR 64 164 223      # Standard lake blue color
+        OUTLINECOLOR -1 -1 -1 # No outline (-1 makes it transparent)
+      END
+    END
+  END
+
+  #############################################
+  # ADDITIONAL LAYERS CAN BE ADDED BELOW
+  #############################################
+
+END

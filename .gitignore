@@ -28,3 +28,4 @@ mapserver/impact_shapefiles/
 mapserver/rasters/
 mapserver/shapefiles/
 mapserver/timeseries_data/
+data/

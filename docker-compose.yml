@@ -10,6 +10,11 @@ services:
       - static_volume:/backend/staticfiles
       - media_volume:/backend/mediafiles
       - ./mapserver:/etc/mapserver/data:z  # Use local data folder instead of volume
+      # Mount the timeseries data from your actual location
+      - ./mapserver/timeseries_data:/etc/mapserver/data/timeseries_data:z
+      # Add impact shapefiles mount
+      - ./mapserver/impact_shapefiles:/etc/mapserver/data/impact_shapefiles:z
+      - ./mapserver/data/rasters:/etc/mapserver/data/rasters:z
     ports:
       - "8090:8000"
     environment:
@@ -49,6 +54,11 @@ services:
     command: celery -A flood_watch_system worker -l info
     volumes:
       - ./mapserver:/etc/mapserver/data:z  # Use local data folder instead of volume
+      # Mount the timeseries data from your actual location
+      - ./mapserver/timeseries_data:/etc/mapserver/data/timeseries_data:z
+      # Add impact shapefiles mount
+      - ./mapserver/impact_shapefiles:/etc/mapserver/data/impact_shapefiles:z
+      - ./mapserver/data/rasters:/etc/mapserver/data/rasters:z
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - DB_HOST=flood_watch_postgis
@@ -81,6 +91,11 @@ services:
     command: celery -A flood_watch_system beat -l info
     volumes:
       - ./mapserver:/etc/mapserver/data:z  # Use local data folder instead of volume
+      # Mount the timeseries data from your actual location
+      - ./mapserver/timeseries_data:/etc/mapserver/data/timeseries_data:z
+      # Add impact shapefiles mount
+      - ./mapserver/impact_shapefiles:/etc/mapserver/data/impact_shapefiles:z
+      - ./mapserver/data/rasters:/etc/mapserver/data/rasters:z
     environment:
       - SECRET_KEY=${SECRET_KEY}
       - DB_HOST=flood_watch_postgis
@@ -146,8 +161,11 @@ services:
     ports:
       - "8093:80"
     volumes:
-      - ./mapserver/shapefiles:/data/shapefiles:z  # GeoJSON data directory with z flag for SELinux
-      - ./mapserver/mapfiles:/etc/mapserver:z  # MapServer config with z flag for SELinux
+      - ./mapserver/shapefiles:/data/shapefiles:z
+      - ./mapserver/mapfiles:/etc/mapserver:z
+      - ./mapserver/impact_shapefiles:/etc/mapserver/data/impact_shapefiles:z
+      # Add this new volume mount for raster data
+      - ./mapserver/data/rasters:/etc/mapserver/data/rasters:z
     user: "0:0"
     environment:
       - MS_MAPFILE=/etc/mapserver/master.map
@@ -181,7 +199,7 @@ services:
       - ./mapcache/config/mapcache.xml:/etc/mapcache/mapcache.xml:z
       - ./mapcache/cache:/var/cache/mapcache:z
       - ./mapcache/locks:/var/lock/mapcache:z
-      - ./mapserver/mapfiles:/etc/mapserver:z  # Mount mapserver config files
+      - ./mapserver/mapfiles:/etc/mapserver:z
     environment:
       - MS_MAPFILE=/etc/mapserver/master.map
       - MAPCACHE_CONFIG_FILE=/etc/mapcache/mapcache.xml
@@ -209,14 +227,20 @@ services:
     volumes:
       - static_volume:/frontend/static
       - media_volume:/frontend/media
-      - ./mapserver:/etc/mapserver/data  # Use local data folder instead of volume
+      - ./mapserver:/etc/mapserver/data:z  # Use local data folder instead of volume
+      # Mount the timeseries data from your actual location
+      - ./mapserver/timeseries_data:/etc/mapserver/data/timeseries_data:z
+      # Add impact shapefiles mount
+      - ./mapserver/impact_shapefiles:/etc/mapserver/data/impact_shapefiles:z
     environment:
       - NODE_ENV=production
       - VITE_API_URL=http://localhost:8090  # Use localhost instead of IP
       - VITE_MAPSERVER_URL=http://localhost:8093  # Use localhost instead of IP
+      - VITE_MAPCACHE_URL=http://localhost:8095  # Use localhost for MapCache
     depends_on:
       - web
       - mapserver
+      - mapcache
     networks:
       - app-network
     restart: unless-stopped

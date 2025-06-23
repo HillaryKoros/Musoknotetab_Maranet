@@ -8,7 +8,8 @@ MAP
   CONFIG "MS_ERRORFILE" "/tmp/mapserver_error.log"
   DEBUG 5
   
-  # Define SHAPEPATH to help MapServer find the shapefiles
+  # Ensure the SHAPEPATH points to the correct directory
+  # and is accessible by the web server user
   SHAPEPATH "/data/shapefiles"
   
   # Web configuration for WMS services
@@ -16,9 +17,15 @@ MAP
   WEB
     METADATA
       "wms_title" "Flood Watch System"
-      "wms_onlineresource" "http://localhost:8093/cgi-bin/mapserv?map=/etc/mapserver/master.map"
+      "wms_onlineresource" "http://197.254.1.10:8093/cgi-bin/mapserv?map=/etc/mapserver/master.map"
       "wms_srs" "EPSG:4326 EPSG:3857 EPSG:900913"
       "wms_enable_request" "*"
+      # Add CORS headers to allow frontend access
+      "ows_enable_request" "*"
+      "wms_encoding" "UTF-8"
+      "ows_http_max_age" "3600"
+      "ows_enable_cors" "true"
+      "ows_cors_allowed_origin" "*"
     END
   END
 
@@ -137,7 +144,704 @@ MAP
   END
 
   #############################################
-  # ADDITIONAL LAYERS CAN BE ADDED BELOW
+  # IMPACT LAYERS - JUST ONE FOR TESTING
   #############################################
+  
+  # Affected Population Layer - Only include this one for now
+  #-------------------------
+  LAYER
+    NAME "impact_population"
+    STATUS ON
+    TYPE POLYGON
+    # Use just the basename without the .shp extension
+    DATA "impact_shapefiles/impact_population"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Affected Population"
+      "wms_abstract" "Population affected by flooding"
+      "wms_enable_request" "*"
+    END
+    
+    CLASSITEM "flood_perc"
+    
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_perc] <= 0.01)
+      STYLE
+        COLOR -1 -1 -1            # Transparent
+        OUTLINECOLOR 200 200 200  # Light grey
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Low Impact (0-10%)"
+      EXPRESSION ([flood_perc] > 0.01 AND [flood_perc] <= 10)
+      STYLE
+        COLOR 255 255 204         # Very light yellow
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Medium Impact (10-30%)"
+      EXPRESSION ([flood_perc] > 10 AND [flood_perc] <= 30)
+      STYLE
+        COLOR 255 204 153         # Light orange
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "High Impact (30-50%)"
+      EXPRESSION ([flood_perc] > 30 AND [flood_perc] <= 50)
+      STYLE
+        COLOR 255 153 102         # Orange
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Very High Impact (50%+)"
+      EXPRESSION ([flood_perc] > 50)
+      STYLE
+        COLOR 255 0 0             # Red
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+  END
+  
+  #############################################
+  # IBEW LAYERS - IMPACT BASED EARLY WARNING
+  # All layers use flood_tot attribute for classification
+  # 3-class system: No Impact, Moderate Impact, High Impact
+  # Author: Hillary Koros
+  # Date: January 2025
+  #############################################
+  
+  #===========================================
+  # HEALTH CENTERS AFFECTED
+  # Shows health facilities impacted by flooding
+  #===========================================
+  LAYER
+    NAME "healthtot"
+    STATUS ON
+    TYPE POLYGON
+    # Update path with actual filename pattern
+    DATA "ibew_shapefiles/healthtot"  # e.g., 20250618000_FPimpacts-healthtot
+    
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Health Centers Affected"
+      "wms_abstract" "Number of health centers affected by flooding"
+      "wms_enable_request" "*"
+      "wms_format" "image/png"
+      "wms_extent" "-180 -90 180 90"  # Update with actual extent
+    END
+    
+    # Classification based on flood_tot attribute
+    CLASSITEM "flood_tot"
+    
+    # Class 1: No Impact (transparent)
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] = 0)
+      STYLE
+        COLOR -1 -1 -1            # Transparent fill
+        OUTLINECOLOR 200 200 200  # Light gray outline
+        WIDTH 0.5
+      END
+    END
+    
+    # Class 2: Moderate Impact (1-50)
+    CLASS
+      NAME "Moderate Impact (1-50)"
+      EXPRESSION ([flood_tot] > 0 AND [flood_tot] <= 50)
+      STYLE
+        COLOR 255 204 0           # Yellow
+        OUTLINECOLOR 150 150 150  # Gray outline
+        WIDTH 0.5
+        OPACITY 70                # 70% opacity
+      END
+    END
+    
+    # Class 3: High Impact (>50)
+    CLASS
+      NAME "High Impact (>50)"
+      EXPRESSION ([flood_tot] > 50)
+      STYLE
+        COLOR 255 0 0             # Red
+        OUTLINECOLOR 150 150 150  # Gray outline
+        WIDTH 0.5
+        OPACITY 70                # 70% opacity
+      END
+    END
+    
+    # Debug settings
+    DEBUG 5
+    # PROCESSING "CLOSE_CONNECTION=DEFER"
+  END # End healthtot layer
 
+  #===========================================
+  # PEOPLE AFFECTED BY 100CM FLOOD DEPTH
+  # Population in areas with severe flooding (>1m)
+  #===========================================
+  LAYER
+    NAME "popaff100"
+    STATUS ON
+    TYPE POLYGON
+    DATA "ibew_shapefiles/popaff100"  # Update with actual path
+    
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "People Affected (100cm)"
+      "wms_abstract" "People affected by at least 100 cm of flood depth"
+      "wms_enable_request" "*"
+      "wms_format" "image/png"
+      "wms_extent" "-180 -90 180 90"
+    END
+    
+    CLASSITEM "flood_tot"
+    
+    # Class 1: No Impact
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] = 0)
+      STYLE
+        COLOR -1 -1 -1            # Transparent
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    
+    # Class 2: Moderate Impact (1-500)
+    CLASS
+      NAME "Moderate Impact (1-500)"
+      EXPRESSION ([flood_tot] > 0 AND [flood_tot] <= 500)
+      STYLE
+        COLOR 255 178 102         # Light orange
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    
+    # Class 3: High Impact (>500)
+    CLASS
+      NAME "High Impact (>500)"
+      EXPRESSION ([flood_tot] > 500)
+      STYLE
+        COLOR 204 0 0             # Dark red
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    
+    DEBUG 5
+  END # End popaff100 layer
+
+  #===========================================
+  # PEOPLE AFFECTED BY 25CM FLOOD DEPTH
+  # Population in areas with moderate flooding (>25cm)
+  #===========================================
+  LAYER
+    NAME "popaff25"
+    STATUS ON
+    TYPE POLYGON
+    DATA "ibew_shapefiles/popaff25"
+    
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "People Affected (25cm)"
+      "wms_abstract" "People affected by at least 25 cm of flood depth"
+      "wms_enable_request" "*"
+      "wms_format" "image/png"
+      "wms_extent" "-180 -90 180 90"
+    END
+    
+    CLASSITEM "flood_tot"
+    
+    # Class 1: No Impact
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] = 0)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    
+    # Class 2: Moderate Impact (1-1000)
+    CLASS
+      NAME "Moderate Impact (1-1000)"
+      EXPRESSION ([flood_tot] > 0 AND [flood_tot] <= 1000)
+      STYLE
+        COLOR 255 204 153         # Peach
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    
+    # Class 3: High Impact (>1000)
+    CLASS
+      NAME "High Impact (>1000)"
+      EXPRESSION ([flood_tot] > 1000)
+      STYLE
+        COLOR 255 102 0           # Orange
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    
+    DEBUG 5
+  END # End popaff25 layer
+
+  #===========================================
+  # TOTAL PEOPLE AFFECTED
+  # All population affected regardless of flood depth
+  #===========================================
+  LAYER
+    NAME "popafftot"
+    STATUS ON
+    TYPE POLYGON
+    DATA "ibew_shapefiles/popafftot"
+    
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Total People Affected"
+      "wms_abstract" "Total population affected by any level of flooding"
+      "wms_enable_request" "*"
+      "wms_format" "image/png"
+      "wms_extent" "-180 -90 180 90"
+    END
+    
+    CLASSITEM "flood_tot"
+    
+    # Class 1: No Impact
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] = 0)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    
+    # Class 2: Moderate Impact (1-2000)
+    CLASS
+      NAME "Moderate Impact (1-2000)"
+      EXPRESSION ([flood_tot] > 0 AND [flood_tot] <= 2000)
+      STYLE
+        COLOR 102 194 164         # Teal
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    
+    # Class 3: High Impact (>2000)
+    CLASS
+      NAME "High Impact (>2000)"
+      EXPRESSION ([flood_tot] > 2000)
+      STYLE
+        COLOR 0 109 44            # Dark green
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    
+    DEBUG 5
+  END # End popafftot layer
+
+  #===========================================
+  # VULNERABLE AGE GROUPS (100CM)
+  # Children <5 and elderly >65 in severe flood areas
+  #===========================================
+  LAYER
+    NAME "popage100"
+    STATUS ON
+    TYPE POLYGON
+    DATA "ibew_shapefiles/popage100"
+    
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Vulnerable Age Groups (100cm)"
+      "wms_abstract" "Vulnerable age groups affected by 100cm+ flooding"
+      "wms_enable_request" "*"
+      "wms_format" "image/png"
+      "wms_extent" "-180 -90 180 90"
+    END
+    
+    CLASSITEM "flood_tot"
+    
+    # Class 1: No Impact
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] = 0)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    
+    # Class 2: Moderate Impact (1-200)
+    CLASS
+      NAME "Moderate Impact (1-200)"
+      EXPRESSION ([flood_tot] > 0 AND [flood_tot] <= 200)
+      STYLE
+        COLOR 251 180 185         # Light pink
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    
+    # Class 3: High Impact (>200)
+    CLASS
+      NAME "High Impact (>200)"
+      EXPRESSION ([flood_tot] > 200)
+      STYLE
+        COLOR 197 27 138          # Purple
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    
+    DEBUG 5
+  END # End popage100 layer
+
+  #===========================================
+  # VULNERABLE AGE GROUPS (25CM)
+  # Children <5 and elderly >65 in moderate flood areas
+  #===========================================
+  LAYER
+    NAME "popage25"
+    STATUS ON
+    TYPE POLYGON
+    DATA "ibew_shapefiles/popage25"
+    
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Vulnerable Age Groups (25cm)"
+      "wms_abstract" "Vulnerable age groups affected by 25cm+ flooding"
+      "wms_enable_request" "*"
+      "wms_format" "image/png"
+      "wms_extent" "-180 -90 180 90"
+    END
+    
+    CLASSITEM "flood_tot"
+    
+    # Class 1: No Impact
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] = 0)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    
+    # Class 2: Moderate Impact (1-500)
+    CLASS
+      NAME "Moderate Impact (1-500)"
+      EXPRESSION ([flood_tot] > 0 AND [flood_tot] <= 500)
+      STYLE
+        COLOR 215 181 216         # Lavender
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    
+    # Class 3: High Impact (>500)
+    CLASS
+      NAME "High Impact (>500)"
+      EXPRESSION ([flood_tot] > 500)
+      STYLE
+        COLOR 128 59 128          # Dark purple
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    
+    DEBUG 5
+  END # End popage25 layer
+
+  #===========================================
+  # REDUCED MOBILITY POPULATION (100CM)
+  # People with disabilities in severe flood areas
+  #===========================================
+  LAYER
+    NAME "popmob100"
+    STATUS ON
+    TYPE POLYGON
+    DATA "ibew_shapefiles/popmob100"
+    
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Reduced Mobility (100cm)"
+      "wms_abstract" "People with reduced mobility affected by 100cm+ flooding"
+      "wms_enable_request" "*"
+      "wms_format" "image/png"
+      "wms_extent" "-180 -90 180 90"
+    END
+    
+    CLASSITEM "flood_tot"
+    
+    # Class 1: No Impact
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] = 0)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    
+    # Class 2: Moderate Impact (1-50)
+    CLASS
+      NAME "Moderate Impact (1-50)"
+      EXPRESSION ([flood_tot] > 0 AND [flood_tot] <= 50)
+      STYLE
+        COLOR 245 178 115         # Light brown
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    
+    # Class 3: High Impact (>50)
+    CLASS
+      NAME "High Impact (>50)"
+      EXPRESSION ([flood_tot] > 50)
+      STYLE
+        COLOR 166 54 3            # Dark brown
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    
+    DEBUG 5
+  END # End popmob100 layer
+
+  #===========================================
+  # REDUCED MOBILITY POPULATION (25CM)
+  # People with disabilities in moderate flood areas
+  #===========================================
+  LAYER
+    NAME "popmob25"
+    STATUS ON
+    TYPE POLYGON
+    DATA "ibew_shapefiles/popmob25"
+    
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Reduced Mobility (25cm)"
+      "wms_abstract" "People with reduced mobility affected by 25cm+ flooding"
+      "wms_enable_request" "*"
+      "wms_format" "image/png"
+      "wms_extent" "-180 -90 180 90"
+    END
+    
+    CLASSITEM "flood_tot"
+    
+    # Class 1: No Impact
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] = 0)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    
+    # Class 2: Moderate Impact (1-100)
+    CLASS
+      NAME "Moderate Impact (1-100)"
+      EXPRESSION ([flood_tot] > 0 AND [flood_tot] <= 100)
+      STYLE
+        COLOR 253 208 162         # Tan
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    
+    # Class 3: High Impact (>100)
+    CLASS
+      NAME "High Impact (>100)"
+      EXPRESSION ([flood_tot] > 100)
+      STYLE
+        COLOR 230 85 13           # Dark orange
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    
+    DEBUG 5
+  END # End popmob25 layer
+
+  #############################################
+  # RASTER LAYERS (FLOOD HAZARD & ALERTS)
+  #############################################
+  
+  # Flood Hazard Layer (from TIFF)
+  #-------------------------------
+  LAYER
+    NAME "flood_hazard"
+    STATUS ON
+    TYPE RASTER
+    DATA "data/rasters/flood_hazard_latest.tif"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Flood Hazard Map"
+      "wms_abstract" "Current flood hazard based on latest FloodProofs simulation"
+      "wms_enable_request" "*"
+    END
+    
+    PROCESSING "SCALE=0,1"
+    PROCESSING "SCALE_BUCKETS=100"
+    
+    CLASS
+      NAME "No Flood"
+      EXPRESSION ([pixel] <= 0.01)
+      STYLE
+        COLOR 255 255 255
+        OPACITY 0
+      END
+    END
+    
+    CLASS
+      NAME "Low Flood Hazard (0-25%)"
+      EXPRESSION ([pixel] > 0.01 AND [pixel] <= 0.25)
+      STYLE
+        COLOR 160 210 255
+      END
+    END
+    
+    CLASS
+      NAME "Medium Flood Hazard (25-50%)"
+      EXPRESSION ([pixel] > 0.25 AND [pixel] <= 0.5)
+      STYLE
+        COLOR 65 182 230
+      END
+    END
+    
+    CLASS
+      NAME "High Flood Hazard (50-75%)"
+      EXPRESSION ([pixel] > 0.5 AND [pixel] <= 0.75)
+      STYLE
+        COLOR 30 115 190
+      END
+    END
+    
+    CLASS
+      NAME "Extreme Flood Hazard (75%+)"
+      EXPRESSION ([pixel] > 0.75)
+      STYLE
+        COLOR 0 60 130
+      END
+    END
+  END
+  
+  # Alerts Layer (from TIFF)
+  #-------------------------
+  LAYER
+    NAME "alerts"
+    STATUS ON
+    TYPE RASTER
+    DATA "data/rasters/alerts_latest.tif"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Flood Alerts Map"
+      "wms_abstract" "Current flood alerts based on latest HMC data"
+      "wms_enable_request" "*"
+    END
+    
+    CLASS
+      NAME "No Alert"
+      EXPRESSION ([pixel] <= 0)
+      STYLE
+        COLOR 255 255 255
+        OPACITY 0
+      END
+    END
+    
+    CLASS
+      NAME "Low Alert (Level 1)"
+      EXPRESSION ([pixel] = 1)
+      STYLE
+        COLOR 45 210 247
+      END
+    END
+    
+    CLASS
+      NAME "Medium Alert (Level 2)"
+      EXPRESSION ([pixel] = 2)
+      STYLE
+        COLOR 255 255 0
+      END
+    END
+    
+    CLASS
+      NAME "High Alert (Level 3+)"
+      EXPRESSION ([pixel] >= 3)
+      STYLE
+        COLOR 255 0 0
+      END
+    END
+  END
+
+  # End of MapFile
 END

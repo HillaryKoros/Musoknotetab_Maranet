@@ -21,7 +21,7 @@
     <size>256 256</size>
   </grid>
 
-  <!-- Sources based on the layers in your master.map file -->
+  <!-- Updated WMS sources for better connectivity -->
   <source name="admin_level_1" type="wms">
     <getmap>
       <params>
@@ -31,7 +31,9 @@
       </params>
     </getmap>
     <http>
-      <url>http://mapserver/cgi-bin/mapserv</url>
+      <url>http://localhost:8093/cgi-bin/mapserv</url>
+      <connection_timeout>60</connection_timeout>
+      <timeout>300</timeout>
     </http>
   </source>
   
@@ -44,7 +46,9 @@
       </params>
     </getmap>
     <http>
-      <url>http://mapserver/cgi-bin/mapserv</url>
+      <url>http://localhost:8093/cgi-bin/mapserv</url>
+      <connection_timeout>60</connection_timeout>
+      <timeout>300</timeout>
     </http>
   </source>
   
@@ -57,7 +61,9 @@
       </params>
     </getmap>
     <http>
-      <url>http://mapserver/cgi-bin/mapserv</url>
+      <url>http://localhost:8093/cgi-bin/mapserv</url>
+      <connection_timeout>60</connection_timeout>
+      <timeout>300</timeout>
     </http>
   </source>
   
@@ -70,7 +76,9 @@
       </params>
     </getmap>
     <http>
-      <url>http://mapserver/cgi-bin/mapserv</url>
+      <url>http://localhost:8093/cgi-bin/mapserv</url>
+      <connection_timeout>60</connection_timeout>
+      <timeout>300</timeout>
     </http>
   </source>
   
@@ -84,11 +92,32 @@
       </params>
     </getmap>
     <http>
-      <url>http://mapserver/cgi-bin/mapserv</url>
+      <url>http://localhost:8093/cgi-bin/mapserv</url>
+      <connection_timeout>60</connection_timeout>
+      <timeout>300</timeout>
     </http>
   </source>
 
-  <!-- Tileset configurations -->
+  <!-- Updated impact_population source with better error handling -->
+  <source name="impact_population" type="wms">
+    <getmap>
+      <params>
+        <FORMAT>image/png</FORMAT>
+        <LAYERS>impact_population</LAYERS>
+        <MAP>/etc/mapserver/master.map</MAP>
+      </params>
+    </getmap>
+    <http>
+      <url>http://localhost:8093/cgi-bin/mapserv</url>
+      <connection_timeout>60</connection_timeout>
+      <timeout>300</timeout>
+    </http>
+    <getfeatureinfo>
+      <info_formats>application/json</info_formats>
+    </getfeatureinfo>
+  </source>
+
+  <!-- Existing Tileset configurations -->
   <tileset name="admin_level_1">
     <source>admin_level_1</source>
     <cache>disk</cache>
@@ -149,12 +178,93 @@
     <auto_expire>86400</auto_expire>
   </tileset>
 
-  <!-- Service endpoints -->
+  <!-- Optimized impact_population tileset -->
+  <tileset name="impact_population">
+    <source>impact_population</source>
+    <cache>disk</cache>
+    <grid>GoogleMapsCompatible</grid>
+    <grid>WGS84</grid>
+    <format>PNG</format>
+    <metatile>4 4</metatile>
+    <metabuffer>10</metabuffer>
+    <expires>3600</expires>
+    <!-- Set to 24 hours to match the daily data update schedule -->
+    <auto_expire>86400</auto_expire>
+    <dimensions>
+      <dimension type="values" name="time" default="2025"/>
+    </dimensions>
+  </tileset>
+  <!-- New raster sources -->
+  <source name="flood_hazard" type="wms">
+    <getmap>
+      <params>
+        <FORMAT>image/png</FORMAT>
+        <LAYERS>flood_hazard</LAYERS>
+        <MAP>/etc/mapserver/master.map</MAP>
+      </params>
+    </getmap>
+    <http>
+      <url>http://localhost:8093/cgi-bin/mapserv</url>
+      <connection_timeout>60</connection_timeout>
+      <timeout>300</timeout>
+    </http>
+  </source>
+  
+  <source name="alerts" type="wms">
+    <getmap>
+      <params>
+        <FORMAT>image/png</FORMAT>
+        <LAYERS>alerts</LAYERS>
+        <MAP>/etc/mapserver/master.map</MAP>
+      </params>
+    </getmap>
+    <http>
+      <url>http://localhost:8093/cgi-bin/mapserv</url>
+      <connection_timeout>60</connection_timeout>
+      <timeout>300</timeout>
+    </http>
+  </source>
+
+  <!-- New raster tilesets -->
+  <tileset name="flood_hazard">
+    <source>flood_hazard</source>
+    <cache>disk</cache>
+    <grid>GoogleMapsCompatible</grid>
+    <grid>WGS84</grid>
+    <format>PNG</format>
+    <metatile>4 4</metatile>
+    <metabuffer>10</metabuffer>
+    <expires>3600</expires>
+    <!-- Auto expire after 6 hours to ensure we get fresh data -->
+    <auto_expire>21600</auto_expire>
+  </tileset>
+  
+  <tileset name="alerts">
+    <source>alerts</source>
+    <cache>disk</cache>
+    <grid>GoogleMapsCompatible</grid>
+    <grid>WGS84</grid>
+    <format>PNG</format>
+    <metatile>4 4</metatile>
+    <metabuffer>10</metabuffer>
+    <expires>3600</expires>
+    <!-- Auto expire after 6 hours to ensure we get fresh data -->
+    <auto_expire>21600</auto_expire>
+  </tileset>
+
+  <!-- Service endpoints with CORS enabled -->
   <service type="wms" enabled="true">
     <full_wms>assemble</full_wms>
     <resample_mode>bilinear</resample_mode>
     <format>PNG</format>
     <maxsize>4096 4096</maxsize>
+    <forwarding_rule name="cors">
+      <http>
+        <header name="Access-Control-Allow-Origin" value="*"/>
+        <header name="Access-Control-Allow-Methods" value="GET, POST, OPTIONS"/>
+        <header name="Access-Control-Allow-Headers" value="Origin, X-Requested-With, Content-Type, Accept"/>
+      </http>
+    </forwarding_rule>
   </service>
   
   <service type="wmts" enabled="true"/>
@@ -164,9 +274,10 @@
   <service type="ve" enabled="true"/>
   <service type="demo" enabled="true"/>
 
-  <!-- Default configuration options -->
+  <!-- Default configuration options with longer timeouts -->
   <default_format>PNG</default_format>
   <errors>report</errors>
   <lock_dir>/var/lock/mapcache</lock_dir>
-  <log_level>info</log_level>
+  <log_level>debug</log_level>
+  <auto_reload>true</auto_reload>
 </mapcache>

@@ -1,3 +1,37 @@
+import React from 'react';
+import { Container, Row, Col, Card } from 'react-bootstrap';
+
+const Analysis = () => {
+  return (
+    <Container fluid className="py-5">
+      <Row className="justify-content-center">
+        <Col lg={6} md={8}>
+          <Card className="text-center shadow-lg border-0">
+            <Card.Body className="py-5">
+              <div className="mb-4">
+                {/* <h1 className="display-4 fw-bold text-primary mb-3">
+                  Analysis
+                </h1> */}
+                <h3 className="text-warning fw-bold mb-4">
+                  🚧 Coming Soon - Under Development 🚧
+                </h3>
+                <p className="text-muted lead">
+                  This feature is currently being developed and will be available soon.
+                </p>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+    </Container>
+  );
+};
+
+export default Analysis;
+
+/*
+COMMENTED OUT - FULL ANALYSIS COMPONENT FOR FUTURE DEVELOPMENT
+
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Form, Button, Spinner, Table, Alert, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { 
@@ -647,3 +681,5 @@ const Analysis = () => {
 };
 
 export default Analysis;
+
+*/

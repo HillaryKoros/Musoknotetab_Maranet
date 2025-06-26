@@ -4,6 +4,7 @@ import {
   TileLayer,
   WMSTileLayer,
   useMapEvents,
+  useMap,
   LayersControl,
   GeoJSON,
   Popup,
@@ -13,6 +14,19 @@ import "leaflet/dist/leaflet.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 import L from "leaflet";
 import { DischargeChart, GeoSFMChart } from "../utils/chartUtils.jsx";
+import IBEWPopupHandler from "../utils/IBEWPopupHandler.jsx";
+
+// Fix Leaflet default icon issue
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+import iconRetina from 'leaflet/dist/images/marker-icon-2x.png';
+
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: iconRetina,
+  iconUrl: icon,
+  shadowUrl: iconShadow,
+});
 
 // Configuration for the map's initial state and WMS server
 const MAP_CONFIG = {
@@ -55,261 +69,9 @@ const GEOFSM_CONFIG = {
   },
 };
 
-// Metadata for layers
+// Metadata for layers - COMMENTED OUT FOR NOW
 const LAYER_METADATA = {
-  'FloodProofs East Africa': {
-    description: 'FloodProof East Africa provides near real-time flood monitoring and early warning systems for East African countries.',
-    details: [
-      'Integrates satellite data with ground observations for accurate flood detection.',
-      'Provides historical flood data and predictive modeling for flood-prone areas.'
-    ],
-    source: 'ICPAC Flood Monitoring System'
-  },
-  'GeoSFM': {
-    description: 'GeoSFM (Geospatial Stream Flow Model) is a hydrological modeling system used for flood forecasting.',
-    details: [
-      'Uses satellite precipitation data to predict river flow and flooding.',
-      'Provides early warning of potential flooding events.'
-    ],
-    source: 'USGS and NASA Earth Observation Systems'
-  },
-  'Mike Hydro': {
-    description: 'Mike Hydro provides comprehensive hydrological modeling for water resource management.',
-    details: [
-      'Simulates river dynamics, flooding, and water quality.',
-      'Supports watershed management and flood mitigation planning.'
-    ],
-    source: 'DHI Group'
-  },
-  'Fast Flood': {
-    description: 'Fast Flood delivers rapid flood detection and monitoring using satellite imagery.',
-    details: [
-      'Provides near real-time flood extent mapping.',
-      'Uses synthetic aperture radar for cloud-penetrating observations.'
-    ],
-    source: 'Regional Remote Sensing Center'
-  },
-  'Glofas': {
-    description: 'Glofas (Global Flood Awareness System) provides global flood forecasting and monitoring.',
-    details: [
-      'Offers medium-range flood forecasts up to 30 days in advance.',
-      'Provides probabilistic flood predictions.'
-    ],
-    source: 'European Commission Joint Research Centre'
-  },
-  'Inundation Map': {
-    description: 'The Inundation Map shows areas currently under water due to flooding.',
-    details: [
-      'Based on satellite data updated daily.',
-      'Shows water extent and depth information.'
-    ],
-    source: 'ICPAC Satellite Observation System'
-  },
-  'Alerts Map': {
-    description: 'The Alerts Map shows areas with active flood warnings and alerts.',
-    details: [
-      'Displays different alert levels based on severity.',
-      'Incorporates weather forecasts and hydrological data.',
-      'Supports early warning and evacuation planning.'
-    ],
-    source: 'Regional Meteorological Services'
-  },
-  'Affected Population': {
-    description: 'Displays an estimate of population impacted by current or predicted flooding.',
-    details: [
-      'Based on population density data overlaid with flood extents.',
-      'Provides estimates at different administrative levels.',
-      'Helps prioritize humanitarian response.',
-      'Updated as flood conditions change.'
-    ],
-    source: 'ICPAC Impact Analysis'
-  },
-  'Affected GDP': {
-    description: 'Shows economic impact of flooding in terms of GDP affected.',
-    details: [
-      'Combines flood extent with economic activity data.',
-      'Helps quantify economic losses.',
-      'Supports disaster recovery planning.',
-      'Useful for long-term resilience planning.'
-    ],
-    source: 'Economic Impact Assessment Unit'
-  },
-  'Affected Crops': {
-    description: 'Displays agricultural areas impacted by flooding.',
-    details: [
-      'Combines flood data with crop distribution maps.',
-      'Helps estimate agricultural losses.',
-      'Supports food security planning.',
-      'Identifies areas for agricultural assistance.'
-    ],
-    source: 'Agricultural Monitoring System'
-  },
-  'Affected Roads': {
-    description: 'Shows roads and transportation infrastructure impacted by flooding.',
-    details: [
-      'Highlights impassable road sections.',
-      'Supports logistics and supply chain planning.',
-      'Helps identify isolated communities.',
-      'Updated regularly based on field reports and satellite data.'
-    ],
-    source: 'Infrastructure Monitoring System'
-  },
-  'Displaced Population': {
-    description: 'Estimates of people displaced from their homes due to flooding.',
-    details: [
-      'Shows likely displacement patterns based on flood severity.',
-      'Helps plan shelter and humanitarian assistance.',
-      'Indicates pressure points for emergency services.',
-      'Based on historical displacement patterns and current conditions.'
-    ],
-    source: 'Displacement Tracking Matrix'
-  },
-  'Affected Livestock': {
-    description: 'Shows livestock populations at risk from flooding.',
-    details: [
-      'Based on livestock distribution data and flood extents.',
-      'Helps plan veterinary services and feed distribution.',
-      'Supports pastoralist community assistance.',
-      'Identifies areas for livestock evacuation.'
-    ],
-    source: 'Livestock Information System'
-  },
-  'Affected Grazing Land': {
-    description: 'Displays grazing areas impacted by flooding.',
-    details: [
-      'Shows pasture and rangeland under water.',
-      'Helps forecast potential livestock movements.',
-      'Supports planning for alternative grazing arrangements.',
-      'Identifies areas for feed distribution.'
-    ],
-    source: 'Rangeland Monitoring System'
-  },
-  'Lakes': {
-    description: 'Display of major lakes and water bodies in the region.',
-    details: [
-      'Shows natural and artificial lakes.',
-      'Helps understand water distribution and flood patterns.',
-      'Important reference for flood impact analysis.'
-    ],
-    source: 'Regional Water Resources Department'
-  },
-  'Rivers': {
-    description: 'Network of major rivers and tributaries in the region.',
-    details: [
-      'Shows main watercourses and drainage patterns.',
-      'Critical for understanding flood pathways.',
-      'Helps predict areas at risk of flooding.'
-    ],
-    source: 'Regional Hydrological Database'
-  },
-  'Basins': {
-    description: 'Watershed basins showing major drainage regions.',
-    details: [
-      'Depicts hydrological catchment areas.',
-      'Important for watershed management.',
-      'Helps understand flood propagation across regions.'
-    ],
-    source: 'Regional Water Resources Management'
-  },
-  'Admin 1': {
-    description: 'Administrative boundaries at the first level.',
-    details: [
-      'Shows primary administrative divisions.',
-      'Used for regional planning and coordination.',
-      'Helps organize disaster response efforts.'
-    ],
-    source: 'National Geographic Information Systems'
-  },
-  'Admin 2': {
-    description: 'Administrative boundaries at the second level.',
-    details: [
-      'Shows more detailed administrative subdivisions.',
-      'Useful for local planning and targeted response.',
-      'Enables more granular analysis of flood impacts.'
-    ],
-    source: 'National Geographic Information Systems'
-  },
-  // IBEW specific layer metadata
-  'Health Centers Affected': {
-    description: 'Shows health centers and medical facilities impacted by flooding.',
-    details: [
-      'Identifies health facilities at risk or already affected.',
-      'Helps prioritize medical supply distribution.',
-      'Supports continuity of healthcare services.',
-      'Critical for emergency medical planning.'
-    ],
-    source: 'Health Infrastructure Monitoring System'
-  },
-  'People Affected (100cm)': {
-    description: 'People affected by at least 100 cm of flood depth.',
-    details: [
-      'Shows areas with severe flooding exceeding 1 meter.',
-      'Indicates zones requiring immediate evacuation.',
-      'Helps prioritize rescue operations.',
-      'Critical depth threshold for life-threatening conditions.'
-    ],
-    source: 'IBEW Flood Impact Analysis'
-  },
-  'People Affected (25cm)': {
-    description: 'People affected by at least 25 cm of flood depth.',
-    details: [
-      'Shows areas with moderate flooding of 25cm or more.',
-      'Indicates zones where movement is restricted.',
-      'Helps plan for assistance and supply distribution.',
-      'Early warning threshold for flood impacts.'
-    ],
-    source: 'IBEW Flood Impact Analysis'
-  },
-  'Total People Affected': {
-    description: 'Total population affected by flooding regardless of depth.',
-    details: [
-      'Comprehensive count of all affected individuals.',
-      'Includes direct and indirect flood impacts.',
-      'Essential for humanitarian response planning.',
-      'Updated based on real-time flood extents.'
-    ],
-    source: 'IBEW Population Impact Assessment'
-  },
-  'Vulnerable Age Groups (100cm)': {
-    description: 'Vulnerable age groups affected by severe flooding (100cm+).',
-    details: [
-      'Focus on children under 5 and elderly over 65 years.',
-      'Higher risk groups requiring priority assistance.',
-      'Critical for targeted evacuation planning.',
-      'Helps allocate specialized medical resources.'
-    ],
-    source: 'IBEW Vulnerability Assessment'
-  },
-  'Vulnerable Age Groups (25cm)': {
-    description: 'Vulnerable age groups affected by moderate flooding (25cm+).',
-    details: [
-      'Children and elderly in areas with restricted movement.',
-      'Early intervention threshold for vulnerable populations.',
-      'Supports preventive evacuation measures.',
-      'Helps plan age-appropriate assistance.'
-    ],
-    source: 'IBEW Vulnerability Assessment'
-  },
-  'Reduced Mobility (100cm)': {
-    description: 'People with reduced mobility affected by severe flooding.',
-    details: [
-      'Individuals with disabilities in high-risk flood zones.',
-      'Requires specialized evacuation equipment.',
-      'Critical for inclusive disaster response.',
-      'Highest priority for assisted evacuation.'
-    ],
-    source: 'IBEW Disability Inclusion Analysis'
-  },
-  'Reduced Mobility (25cm)': {
-    description: 'People with reduced mobility affected by moderate flooding.',
-    details: [
-      'Early warning for disability-inclusive planning.',
-      'Identifies areas needing accessible routes.',
-      'Supports proactive assistance measures.',
-      'Helps prevent isolation of disabled individuals.'
-    ],
-    source: 'IBEW Disability Inclusion Analysis'
-  }
+  // Metadata will be added here later
 };
 
 // Helper function to handle layer loading errors
@@ -321,16 +83,30 @@ const handleLayerError = (layerId, error) => {
 const createWMSLayer = (name, layerId, isMapServer = false, useCache = true, needsDate = false) => {
   const wmsUrl = (useCache && isMapServer) ? MAP_CONFIG.mapcacheWMSUrl : MAP_CONFIG.mapserverWMSUrl;
   
+  // Build proper legend URL
+  let legendUrl;
+  if (isMapServer) {
+    // For MapServer layers, ensure proper URL construction
+    legendUrl = `${MAP_CONFIG.mapserverWMSUrl}&SERVICE=WMS&VERSION=1.1.0&REQUEST=GetLegendGraphic&LAYER=${layerId}&FORMAT=image/png&SLD_VERSION=1.1.0&STYLE=default`;
+    
+    // Add date parameters for date-based layers
+    if (needsDate) {
+      const currentDate = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      legendUrl += `&date=${currentDate}&datetime=${currentDate}0000`;
+    }
+  } else {
+    // For non-MapServer layers (if you have any)
+    legendUrl = `${MAP_CONFIG.geoserverWMSUrl}?SERVICE=WMS&VERSION=1.0.0&REQUEST=GetLegendGraphic&LAYER=floodwatch:${layerId}&FORMAT=image/png`;
+  }
+  
   return {
     name,
     layer: layerId,
-    legend: isMapServer 
-      ? `${MAP_CONFIG.mapserverWMSUrl}&REQUEST=GetLegendGraphic&VERSION=1.1.0&FORMAT=image/png&LAYER=${layerId}&SLD_VERSION=1.1.0`
-      : `${MAP_CONFIG.geoserverWMSUrl}?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=image/png&LAYER=floodwatch:${layerId}`,
+    legend: legendUrl,
     isMapServer,
     useCache,
     wmsUrl,
-    needsDate // Flag to indicate if this layer needs date formatting
+    needsDate
   };
 };
 
@@ -350,21 +126,21 @@ const formatLayerIdWithDate = (baseLayerId, date, layerType) => {
     case 'inundation':
       return `${baseLayerId}_${formattedDate}`;
     case 'impact':
-      return baseLayerId; // Impact layers don't use dates
+      return `${baseLayerId}_${formattedDate}`; // FIXED: Added date support for impact layers
     default:
       return baseLayerId;
   }
 };
 
-// Impact layers - no date support
+// Impact layers - UPDATED: now with date support
 const IMPACT_LAYERS = [
-  createWMSLayer("Affected Population", "impact_population", true, true, false),
-  createWMSLayer("Affected GDP", "impact_gdp", true, true, false),
-  createWMSLayer("Affected Crops", "impact_crops", true, true, false),
-  createWMSLayer("Affected Roads", "impact_roads", true, true, false),
-  createWMSLayer("Displaced Population", "impact_displaced", true, true, false),
-  createWMSLayer("Affected Livestock", "impact_livestock", true, true, false),
-  createWMSLayer("Affected Grazing Land", "impact_grazing", true, true, false),
+  createWMSLayer("Affected Population", "impact_population", true, true, true), // Changed to true
+  createWMSLayer("Affected GDP", "impact_gdp", true, true, true), // Changed to true
+  createWMSLayer("Affected Crops", "impact_crops", true, true, true), // Changed to true
+  createWMSLayer("Affected Roads", "impact_roads", true, true, true), // Changed to true
+  createWMSLayer("Displaced Population", "impact_displaced", true, true, true), // Changed to true
+  createWMSLayer("Affected Livestock", "impact_livestock", true, true, true), // Changed to true
+  createWMSLayer("Affected Grazing Land", "impact_grazing", true, true, true), // Changed to true
 ];
 
 // IBEW Layers - UPDATED to use the exact layer names from GetCapabilities
@@ -418,6 +194,21 @@ const InfoIcon = ({ layerName, onClick }) => (
     onClick={(e) => {
       e.stopPropagation();
       onClick(layerName);
+    }}
+    style={{
+      cursor: 'pointer',
+      marginLeft: '8px',
+      fontSize: '14px',
+      color: '#007bff',
+      fontWeight: 'bold',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '20px',
+      height: '20px',
+      borderRadius: '50%',
+      border: '1px solid #007bff',
+      lineHeight: '1'
     }}
   >
     i
@@ -538,18 +329,29 @@ const LayerSelector = ({ title, layers, selectedLayers, onLayerSelect, onInfoCli
   );
 };
 
-// Component to render map legends
+// FIXED MapLegend component - removes "Legend not available" text
 const MapLegend = ({ legendUrl, title }) => {
+  const [imageError, setImageError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Reset states when legendUrl changes
+  useEffect(() => {
+    setImageError(false);
+    setIsLoading(true);
+  }, [legendUrl]);
+  
   const needsCustomLegend = () =>
     title === "Hazard Map" ||
-    legendUrl?.includes("floodwatch:Alerts") ||
-    title === "GeoFSM" ||
-    legendUrl?.includes("floodwatch:geofsm_layer");
+    title === "Inundation Map" ||
+    legendUrl?.includes("Alerts") ||
+    title === "GeoSFM" ||
+    title === "Alerts Map" ||
+    legendUrl?.includes("geofsm_layer");
     
   const legendData = needsCustomLegend()
-    ? title === "GeoFSM" || legendUrl?.includes("floodwatch:geofsm_layer")
+    ? title === "GeoSFM" || legendUrl?.includes("geofsm_layer")
       ? {
-          title: "GeoFSM",
+          title: "GeoSFM",
           items: [
             { color: "#2c7fb8", label: "Low Risk" },
             { color: "#7fcdbb", label: "Medium Risk" },
@@ -566,37 +368,61 @@ const MapLegend = ({ legendUrl, title }) => {
         }
     : null;
 
-  return needsCustomLegend() ? (
-    <div className="map-legend">
-      <h5>{legendData.title}</h5>
-      {legendData.items.map((item, index) => (
-        <div
-          key={index}
-          style={{ display: "flex", alignItems: "center", marginBottom: "8px" }}
-        >
+  if (needsCustomLegend()) {
+    return (
+      <div className="map-legend">
+        <h5>{legendData.title}</h5>
+        {legendData.items.map((item, index) => (
           <div
-            style={{
-              width: "24px",
-              height: "24px",
-              backgroundColor: item.color,
-              marginRight: "8px",
-              border: "1px solid #ccc",
-            }}
-          />
-          <span style={{ fontSize: "12px" }}>{item.label}</span>
-        </div>
-      ))}
-    </div>
-  ) : legendUrl ? (
+            key={index}
+            style={{ display: "flex", alignItems: "center", marginBottom: "8px" }}
+          >
+            <div
+              style={{
+                width: "24px",
+                height: "24px",
+                backgroundColor: item.color,
+                marginRight: "8px",
+                border: "1px solid #ccc",
+              }}
+            />
+            <span style={{ fontSize: "12px" }}>{item.label}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  
+  // FIXED: Only show legend if we have a valid URL and no error
+  if (!legendUrl || imageError) {
+    return null; // Return null instead of showing "Legend not available"
+  }
+
+  return (
     <div className="map-legend">
       <h5>{title}</h5>
+      {isLoading && (
+        <div style={{ padding: "10px", textAlign: "center", fontSize: "12px", color: "#666" }}>
+          Loading legend...
+        </div>
+      )}
       <img
         src={legendUrl}
         alt={`Legend for ${title}`}
-        onError={(e) => (e.target.style.display = "none")}
+        onLoad={() => setIsLoading(false)}
+        onError={(e) => {
+          console.error(`Failed to load legend for ${title}:`, legendUrl);
+          setImageError(true);
+          setIsLoading(false);
+        }}
+        style={{ 
+          display: isLoading ? 'none' : 'block',
+          maxWidth: '100%',
+          height: 'auto'
+        }}
       />
     </div>
-  ) : null;
+  );
 };
 
 // Component for the sidebar with tabs
@@ -840,6 +666,7 @@ const TabSidebar = ({
               onInfoClick={onInfoClick}
               selectedDate={selectedDates?.impact}
               onDateChange={(date) => onDateChange('impact', date)}
+              showCalendar={true} // FIXED: Changed from false to true
             />
             <LayerSelector
               title="IBEW Layers"
@@ -855,89 +682,6 @@ const TabSidebar = ({
       </Tab.Container>
     </div>
   );
-};
-
-// UPDATED FeatureInfoHandler to filter IBEW layer results
-const FeatureInfoHandler = ({ map, selectedLayers, selectedBoundaryLayers, onFeatureInfo, selectedDates }) => {
-  useMapEvents({
-    click: async (e) => {
-      if (!map || (selectedLayers.size === 0 && selectedBoundaryLayers.size === 0)) return;
-      
-      const point = map.latLngToContainerPoint(e.latlng);
-      const size = map.getSize();
-      const bounds = map.getBounds();
-      
-      // Check if any IBEW layers are active
-      const activeIBEWLayers = Array.from(selectedLayers).filter(layerId => 
-        IBEW_LAYERS.some(ibewLayer => ibewLayer.layer === layerId)
-      );
-      
-      // If IBEW layers are active, only query those layers
-      const layersToQuery = activeIBEWLayers.length > 0 
-        ? activeIBEWLayers 
-        : [...Array.from(selectedLayers), ...Array.from(selectedBoundaryLayers)];
-      
-      if (layersToQuery.length > 0) {
-        const params = new URLSearchParams({
-          SERVICE: "WMS",
-          VERSION: "1.1.0",
-          REQUEST: "GetFeatureInfo",
-          QUERY_LAYERS: layersToQuery.join(","),
-          LAYERS: layersToQuery.join(","),
-          INFO_FORMAT: MAP_CONFIG.getFeatureInfoFormat,
-          X: Math.round(point.x),
-          Y: Math.round(point.y),
-          WIDTH: size.x,
-          HEIGHT: size.y,
-          BBOX: `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`,
-          SRS: "EPSG:4326",
-          FEATURE_COUNT: 10,
-        });
-
-        // Add date parameters for IBEW layers
-        if (activeIBEWLayers.length > 0 && selectedDates?.ibew) {
-          const formattedDate = selectedDates.ibew.replace(/-/g, '');
-          params.set('date', formattedDate);
-          params.set('datetime', `${formattedDate}0000`);
-        }
-
-        try {
-          const response = await fetch(`${MAP_CONFIG.mapserverWMSUrl}&${params}`);
-          if (!response.ok)
-            throw new Error(`HTTP error! status: ${response.status}`);
-          const data = await response.json();
-          
-          if (data?.features?.length > 0) {
-            // Filter features to only show IBEW layer data if IBEW layers are active
-            let filteredFeatures = data.features;
-            
-            if (activeIBEWLayers.length > 0) {
-              // Only show features from IBEW layers
-              filteredFeatures = data.features.filter(feature => {
-                // Check if the feature belongs to an IBEW layer
-                // This can be determined by the layer name in the feature properties
-                const layerName = feature.properties?.layer_name || feature.layer;
-                return activeIBEWLayers.some(ibewLayerId => {
-                  // Remove the %date% placeholder for comparison
-                  const baseLayerId = ibewLayerId.replace('_%date%', '');
-                  return layerName?.includes(baseLayerId) || layerName === ibewLayerId;
-                });
-              });
-            }
-            
-            if (filteredFeatures.length > 0) {
-              onFeatureInfo(
-                filteredFeatures.map((feature) => ({ feature, position: e.latlng }))
-              );
-            }
-          }
-        } catch (error) {
-          console.error("Error fetching feature info from MapServer:", error);
-        }
-      }
-    },
-  });
-  return null;
 };
 
 // UPDATED StableWMSLayer component to handle runtime substitution properly
@@ -996,7 +740,6 @@ const StableWMSLayer = React.memo(({ url, layers, transparent = true, format = "
 
 // Main MapViewer component
 const MapViewer = () => {
-  const [map, setMap] = useState(null);
   const [selectedLayers, setSelectedLayers] = useState(new Set());
   const [isSidebarActive, setIsSidebarActive] = useState(true);
   const [selectedBoundaryLayers, setSelectedBoundaryLayers] = useState(new Set([
@@ -1023,7 +766,6 @@ const MapViewer = () => {
   const [selectedYear, setSelectedYear] = useState("2023");
   const [availableDataTypes, setAvailableDataTypes] = useState([]);
   const [availableYears, setAvailableYears] = useState(["2023"]);
-  const [featurePopups, setFeaturePopups] = useState([]);
   const [isLayerControlVisible, setIsLayerControlVisible] = useState(false);
   
   // State for metadata modal
@@ -1054,10 +796,11 @@ const MapViewer = () => {
 
   // Handler for info icon clicks
   const handleInfoClick = (layerName) => {
+    // For now, show a simple placeholder since metadata is empty
     const metadata = LAYER_METADATA[layerName] || {
       title: layerName,
-      description: `Metadata for ${layerName}`,
-      details: ["Detailed information not available"],
+      description: `Information about ${layerName}`,
+      details: ["Details will be added soon"],
       source: "East Africa Flood Watch"
     };
     
@@ -1222,7 +965,6 @@ const MapViewer = () => {
         return newSelectedLayers;
       });
       
-      setFeaturePopups([]);
       setShowChart(false);
       setSelectedStation(null);
       setTimeSeriesData([]);
@@ -1343,14 +1085,6 @@ const MapViewer = () => {
     [geoFSMData],
   );
 
-  const handleFeatureInfo = useCallback((features) => {
-    if (features?.length) setFeaturePopups(features);
-  }, []);
-
-  useEffect(() => {
-    setFeaturePopups([]);
-  }, [selectedLayers, selectedBoundaryLayers]);
-
   const toggleSidebar = () => setIsSidebarActive(!isSidebarActive);
   
   // Update hazard layers
@@ -1421,7 +1155,6 @@ const MapViewer = () => {
             zoom={MAP_CONFIG.initialZoom}
             scrollWheelZoom={true}
             style={{ height: "100%", width: "100%" }}
-            whenCreated={setMap}
             key={mapKey}
           >
             <TileLayer
@@ -1602,45 +1335,36 @@ const MapViewer = () => {
                 }}
               />
             )}
-            <FeatureInfoHandler
-              map={map}
+            
+            {/* IBEW Popup Handler - replaces old FeatureInfoHandler */}
+            <IBEWPopupHandler
               selectedLayers={selectedLayers}
-              selectedBoundaryLayers={selectedBoundaryLayers}
-              onFeatureInfo={handleFeatureInfo}
-              selectedDates={selectedDates}
+              selectedDate={selectedDates?.ibew}
+              mapConfig={MAP_CONFIG}
             />
-            {featurePopups.map((popup, index) => (
-              <Popup
-                key={`popup-${index}-${popup.position.lat}-${popup.position.lng}`}
-                position={[popup.position.lat, popup.position.lng]}
-                onClose={() =>
-                  setFeaturePopups((current) =>
-                    current.filter((_, i) => i !== index),
-                  )
-                }
-              >
-                <div className="feature-info">
-                  {popup.feature.properties &&
-                    Object.entries(popup.feature.properties)
-                      .filter(([key]) => !key.startsWith("_") && key !== "bbox")
-                      .map(([key, value]) => (
-                        <div key={key} className="popup-row">
-                          <strong>{key}:</strong> {value}
-                        </div>
-                      ))}
-                </div>
-              </Popup>
-            ))}
+            
           </MapContainer>
           {activeLegend && (
-            <MapLegend
-              legendUrl={activeLegend}
-              title={
-                [...hazardLayersWithDate, ...IMPACT_LAYERS, ...IBEW_LAYERS, ...BOUNDARY_LAYERS].find(
-                  (layer) => layer.legend === activeLegend,
-                )?.name || "Legend"
-              }
-            />
+            <div className="map-legend" style={{ 
+              position: 'absolute', 
+              bottom: '20px', 
+              right: '20px', 
+              backgroundColor: 'white', 
+              padding: '15px', 
+              borderRadius: '8px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              zIndex: 1000,
+              maxWidth: '300px'
+            }}>
+              <MapLegend
+                legendUrl={activeLegend}
+                title={
+                  [...hazardLayersWithDate, ...IMPACT_LAYERS, ...IBEW_LAYERS, ...BOUNDARY_LAYERS].find(
+                    (layer) => layer.legend === activeLegend,
+                  )?.name || "Legend"
+                }
+              />
+            </div>
           )}
         </div>
         {showChart && (

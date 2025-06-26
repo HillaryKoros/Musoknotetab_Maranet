@@ -29,3 +29,4 @@ mapserver/rasters/
 mapserver/shapefiles/
 mapserver/timeseries_data/
 data/
+frontend/public/

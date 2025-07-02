@@ -964,14 +964,11 @@ input:checked + .toggle-slider-small:before {
 @media (max-width: 575.98px) {
   .chart-container {
     padding: 0 10px 5px 10px;
+    height: 280px;
   }
   
   .bottom-panel {
-    height: 250px;
-  }
-  
-  .chart-container {
-    height: 250px;
+    height: 320px;
   }
   
   .map-container {

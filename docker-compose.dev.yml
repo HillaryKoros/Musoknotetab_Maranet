@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # Override for faster local development builds
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      cache_from:
+        - hkoros/flood_watch_system_backend:v1.2
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      cache_from:
+        - hkoros/flood_watch_system_backend:v1.2
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+    
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      cache_from:
+        - hkoros/flood_watch_system_backend:v1.2
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+
+  # Use pre-built images for services that rarely change
+  db:
+    image: hkoros/floodwatch_postgis:v1.2
+    # No build needed - use registry image
+    
+  redis:
+    image: hkoros/redis:v1.2
+    # No build needed - use registry image
+
+  mapserver:
+    # For faster builds, use cache or pre-built image when possible
+    build:
+      context: ./mapserver
+      dockerfile: Dockerfile
+      cache_from:
+        - hkoros/floodwatch_mapserver:v1.1
+      args:
+        BUILDKIT_INLINE_CACHE: 1
+
+  mapcache:
+    image: hkoros/floodwatch_mapcache:v1.0
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+      cache_from:
+        - hkoros/flood_watch_system_frontend:v1.2
+      args:
+        BUILDKIT_INLINE_CACHE: 1

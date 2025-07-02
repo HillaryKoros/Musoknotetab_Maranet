@@ -44,7 +44,12 @@ echo "OK"' > /usr/lib/cgi-bin/health \
 # Create directories
 RUN mkdir -p /etc/mapserver /data/geojson
 
+# Copy entrypoint script
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 WORKDIR /etc/mapserver
 EXPOSE 80
 
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["apache2ctl", "-D", "FOREGROUND"]

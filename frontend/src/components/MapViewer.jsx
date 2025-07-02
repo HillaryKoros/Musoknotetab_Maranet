@@ -760,6 +760,11 @@ const MapViewer = () => {
   const [timeSeriesData, setTimeSeriesData] = useState([]);
   const [geoFSMTimeSeriesData, setGeoFSMTimeSeriesData] = useState([]);
   const [showChart, setShowChart] = useState(false);
+  
+  // Debug showChart changes
+  useEffect(() => {
+    console.log("showChart state changed:", showChart);
+  }, [showChart]);
   const [chartType, setChartType] = useState("discharge");
   const [geoFSMDataType, setGeoFSMDataType] = useState("riverdepth");
   const [selectedSeries, setSelectedSeries] = useState("both");
@@ -1006,11 +1011,17 @@ const MapViewer = () => {
 
   const handleStationClick = useCallback(
     (feature) => {
+      console.log("Station clicked:", feature?.properties?.SEC_NAME || feature?.properties?.Name);
       setSelectedStation(feature);
       setShowChart(true);
-      if (!feature?.properties) return;
+      
+      if (!feature?.properties) {
+        console.log("No properties found in feature");
+        return;
+      }
 
       const dataType = feature.properties.data_type || "discharge";
+      console.log("Data type:", dataType);
       setChartType(dataType);
       setGeoFSMDataType(dataType === "discharge" ? "riverdepth" : dataType);
 
@@ -1061,7 +1072,7 @@ const MapViewer = () => {
               ?.split(",")
               .map((val) => Number(val.trim()) || 0) || [];
 
-          const data = timePeriod
+          const rawData = timePeriod
             .map((time, index) => ({
               time: new Date(time),
               gfs: gfsValues[index],
@@ -1073,7 +1084,34 @@ const MapViewer = () => {
                 !isNaN(item.gfs) &&
                 !isNaN(item.icon),
             );
-          setTimeSeriesData(data);
+
+          // Aggregate data by day (daily averages)
+          const dailyData = rawData.reduce((acc, item) => {
+            const dateKey = item.time.toISOString().split('T')[0]; // Get YYYY-MM-DD format
+            
+            if (!acc[dateKey]) {
+              acc[dateKey] = {
+                date: new Date(dateKey),
+                gfsValues: [],
+                iconValues: []
+              };
+            }
+            
+            acc[dateKey].gfsValues.push(item.gfs);
+            acc[dateKey].iconValues.push(item.icon);
+            
+            return acc;
+          }, {});
+
+          // Calculate daily averages
+          const aggregatedData = Object.values(dailyData).map(day => ({
+            time: day.date,
+            gfs: day.gfsValues.reduce((sum, val) => sum + val, 0) / day.gfsValues.length,
+            icon: day.iconValues.reduce((sum, val) => sum + val, 0) / day.iconValues.length
+          })).sort((a, b) => a.time - b.time);
+
+          console.log("Processed time series data:", aggregatedData.length, "daily points");
+          setTimeSeriesData(aggregatedData);
           setGeoFSMTimeSeriesData([]);
         }
       } catch (error) {
@@ -1368,7 +1406,19 @@ const MapViewer = () => {
           )}
         </div>
         {showChart && (
-          <div className={`bottom-panel ${isMobile && isSidebarActive ? 'with-sidebar' : ''}`}>
+          <div className={`bottom-panel ${isMobile && isSidebarActive ? 'with-sidebar' : ''}`} style={{
+            position: 'fixed',
+            bottom: '0px',
+            left: isSidebarActive ? '350px' : '0px',
+            right: '0px',
+            height: '350px',
+            backgroundColor: 'white',
+            border: '1px solid #ddd',
+            borderBottom: 'none',
+            boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.15)',
+            zIndex: 900,
+            display: 'block'
+          }}>
             <div className="chart-header">
               <h5>
                 {selectedStation?.properties?.SEC_NAME ||
@@ -1378,42 +1428,573 @@ const MapViewer = () => {
                       ? "GeoSFM Streamflow"
                       : "Discharge Forecast")}
               </h5>
-              {(chartType === "riverdepth" || chartType === "streamflow") && (
-                <div className="chart-controls">
-                  {availableDataTypes.length > 1 && (
-                    <select
-                      value={geoFSMDataType}
-                      onChange={(e) => {
-                        setGeoFSMDataType(e.target.value);
-                        setChartType(e.target.value);
-                      }}
-                      style={{ marginLeft: "10px" }}
-                    >
-                      {availableDataTypes.map((type) => (
-                        <option key={type} value={type}>
-                          {type === "riverdepth" ? "River Depth" : "Streamflow"}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              )}
-              <button
-                className="close-button"
-                onClick={() => {
-                  setShowChart(false);
-                  setSelectedStation(null);
-                  setTimeSeriesData([]);
-                  setGeoFSMTimeSeriesData([]);
-                }}
-              >
-                ×
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {(chartType === "riverdepth" || chartType === "streamflow") && (
+                  <div className="chart-controls">
+                    {availableDataTypes.length > 1 && (
+                      <select
+                        value={geoFSMDataType}
+                        onChange={(e) => {
+                          setGeoFSMDataType(e.target.value);
+                          setChartType(e.target.value);
+                        }}
+                        style={{ marginRight: "10px" }}
+                      >
+                        {availableDataTypes.map((type) => (
+                          <option key={type} value={type}>
+                            {type === "riverdepth" ? "River Depth" : "Streamflow"}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
+                
+                {/* Export buttons */}
+                <button
+                  onClick={() => {
+                    if (chartType === "riverdepth" || chartType === "streamflow") {
+                      const stationName = selectedStation?.properties?.Name || selectedStation?.properties?.Descriptio || 'GeoSFM Station';
+                      const csvData = geoFSMTimeSeriesData.map(item => ({
+                        Date: new Date(item.timestamp).toISOString().split('T')[0],
+                        [`${chartType === 'riverdepth' ? 'River Depth' : 'Streamflow'} (${chartType === 'riverdepth' ? 'm' : 'm³/s'})`]: item[chartType === 'riverdepth' ? 'depth' : 'streamflow'] || ''
+                      }));
+                      const headers = Object.keys(csvData[0]).join(',');
+                      const csvContent = [
+                        `# ${stationName} - ${chartType}`,
+                        `# Generated on: ${new Date().toLocaleString()}`,
+                        headers,
+                        ...csvData.map(row => Object.values(row).join(','))
+                      ].join('\n');
+                      const blob = new Blob([csvContent], { type: 'text/csv' });
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `${stationName}_${chartType}.csv`;
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                    } else {
+                      const stationName = selectedStation?.properties?.SEC_NAME || 'FloodProofs Station';
+                      const csvData = timeSeriesData.map(item => ({
+                        Date: item.time.toISOString().split('T')[0],
+                        'GFS Forecast (m³/s)': item.gfs || '',
+                        'ICON Forecast (m³/s)': item.icon || ''
+                      }));
+                      const headers = Object.keys(csvData[0]).join(',');
+                      const csvContent = [
+                        `# ${stationName} - discharge_forecast`,
+                        `# Generated on: ${new Date().toLocaleString()}`,
+                        headers,
+                        ...csvData.map(row => Object.values(row).join(','))
+                      ].join('\n');
+                      const blob = new Blob([csvContent], { type: 'text/csv' });
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `${stationName}_discharge_forecast.csv`;
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                    }
+                  }}
+                  style={{
+                    padding: '4px 8px',
+                    backgroundColor: '#28a745',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  📊 CSV
+                </button>
+                
+                <button
+                  onClick={() => {
+                    // FloodProofs: Create professional 3-chart layout
+                    if (chartType === "discharge" && timeSeriesData && timeSeriesData.length > 0) {
+                      const canvas = document.createElement('canvas');
+                      const ctx = canvas.getContext('2d');
+                      
+                      canvas.width = 1200;
+                      canvas.height = 900;
+                      
+                      // Fill background
+                      ctx.fillStyle = 'white';
+                      ctx.fillRect(0, 0, canvas.width, canvas.height);
+                      
+                      const stationName = selectedStation?.properties?.SEC_NAME || 'FloodProofs Station';
+                      
+                      // Header section
+                      ctx.fillStyle = '#f8f9fa';
+                      ctx.fillRect(0, 0, canvas.width, 80);
+                      ctx.strokeStyle = '#dee2e6';
+                      ctx.lineWidth = 1;
+                      ctx.strokeRect(0, 0, canvas.width, canvas.height);
+                      ctx.strokeRect(0, 0, canvas.width, 80);
+                      
+                      // Title
+                      ctx.fillStyle = '#1B6840';
+                      ctx.font = 'bold 20px Arial';
+                      ctx.fillText(`${stationName} - Discharge Forecast Analysis`, 20, 25);
+                      
+                      // Station details
+                      ctx.fillStyle = '#333';
+                      ctx.font = '12px Arial';
+                      const basin = selectedStation?.properties?.BASIN || 'N/A';
+                      const area = selectedStation?.properties?.AREA || 'N/A';
+                      const lat = selectedStation?.properties?.latitude?.toFixed(4) || 'N/A';
+                      const lng = selectedStation?.properties?.longitude?.toFixed(4) || 'N/A';
+                      
+                      ctx.fillText(`Basin: ${basin} | Area: ${area} km² | Location: ${lat}°N, ${lng}°E`, 20, 45);
+                      
+                      // Thresholds
+                      const alertThreshold = selectedStation?.properties?.Q_THR1 || 'N/A';
+                      const alarmThreshold = selectedStation?.properties?.Q_THR2 || 'N/A';
+                      const emergencyThreshold = selectedStation?.properties?.Q_THR3 || 'N/A';
+                      
+                      ctx.fillStyle = '#ff9800';
+                      ctx.fillText(`Alert: ${alertThreshold} m³/s`, 20, 62);
+                      ctx.fillStyle = '#f44336';
+                      ctx.fillText(`| Alarm: ${alarmThreshold} m³/s`, 150, 62);
+                      ctx.fillStyle = '#d32f2f';
+                      ctx.fillText(`| Emergency: ${emergencyThreshold} m³/s`, 300, 62);
+                      
+                      // Branding
+                      ctx.fillStyle = '#1B6840';
+                      ctx.font = 'bold 14px Arial';
+                      ctx.fillText('East Africa Flood Watch | IGAD-ICPAC', canvas.width - 320, 25);
+                      ctx.fillStyle = '#666';
+                      ctx.font = '10px Arial';
+                      ctx.fillText(`Generated: ${new Date().toLocaleString()}`, canvas.width - 200, 45);
+                      
+                      // Chart dimensions
+                      const chartWidth = 540;
+                      const chartHeight = 240;
+                      const margin = { top: 40, right: 40, bottom: 60, left: 80 };
+                      
+                      // Helper function to draw professional chart
+                      const drawProfessionalChart = (x, y, data, title, isLine = true, modelKey = null) => {
+                        // Chart background
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(x, y, chartWidth, chartHeight);
+                        ctx.strokeStyle = '#e0e0e0';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(x, y, chartWidth, chartHeight);
+                        
+                        // Plot area
+                        const plotX = x + margin.left;
+                        const plotY = y + margin.top;
+                        const plotWidth = chartWidth - margin.left - margin.right;
+                        const plotHeight = chartHeight - margin.top - margin.bottom;
+                        
+                        // Title
+                        ctx.fillStyle = '#333';
+                        ctx.font = 'bold 14px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(title, x + chartWidth / 2, y + 20);
+                        ctx.textAlign = 'left';
+                        
+                        if (isLine) {
+                          // Line chart for individual models
+                          const maxValue = Math.max(...data.map(d => d[modelKey]));
+                          const yScale = plotHeight / (maxValue * 1.1);
+                          const xScale = plotWidth / (data.length - 1);
+                          
+                          // Grid lines
+                          ctx.strokeStyle = '#f0f0f0';
+                          ctx.lineWidth = 1;
+                          for (let i = 0; i <= 5; i++) {
+                            const gridY = plotY + plotHeight - (i * plotHeight / 5);
+                            ctx.beginPath();
+                            ctx.moveTo(plotX, gridY);
+                            ctx.lineTo(plotX + plotWidth, gridY);
+                            ctx.stroke();
+                          }
+                          
+                          // Y-axis
+                          ctx.strokeStyle = '#333';
+                          ctx.lineWidth = 2;
+                          ctx.beginPath();
+                          ctx.moveTo(plotX, plotY);
+                          ctx.lineTo(plotX, plotY + plotHeight);
+                          ctx.stroke();
+                          
+                          // X-axis
+                          ctx.beginPath();
+                          ctx.moveTo(plotX, plotY + plotHeight);
+                          ctx.lineTo(plotX + plotWidth, plotY + plotHeight);
+                          ctx.stroke();
+                          
+                          // Y-axis labels
+                          ctx.fillStyle = '#666';
+                          ctx.font = '10px Arial';
+                          ctx.textAlign = 'right';
+                          for (let i = 0; i <= 5; i++) {
+                            const value = (maxValue * i) / 5;
+                            const labelY = plotY + plotHeight - (i * plotHeight / 5);
+                            ctx.fillText(value.toFixed(1), plotX - 10, labelY + 3);
+                          }
+                          
+                          // Y-axis title
+                          ctx.save();
+                          ctx.translate(plotX - 50, plotY + plotHeight / 2);
+                          ctx.rotate(-Math.PI / 2);
+                          ctx.font = 'bold 12px Arial';
+                          ctx.textAlign = 'center';
+                          ctx.fillText('Discharge (m³/s)', 0, 0);
+                          ctx.restore();
+                          
+                          // X-axis labels (dates)
+                          ctx.textAlign = 'center';
+                          ctx.font = '9px Arial';
+                          data.forEach((point, i) => {
+                            if (i % Math.ceil(data.length / 6) === 0) {
+                              const labelX = plotX + (i * xScale);
+                              ctx.save();
+                              ctx.translate(labelX, plotY + plotHeight + 15);
+                              ctx.rotate(-Math.PI / 6);
+                              ctx.fillText(point.time.toLocaleDateString('en-GB'), 0, 0);
+                              ctx.restore();
+                            }
+                          });
+                          
+                          // Draw line
+                          const color = modelKey === 'gfs' ? '#1f77b4' : '#ff7f0e';
+                          ctx.strokeStyle = color;
+                          ctx.lineWidth = 3;
+                          ctx.beginPath();
+                          
+                          data.forEach((point, i) => {
+                            const pointX = plotX + (i * xScale);
+                            const pointY = plotY + plotHeight - (point[modelKey] * yScale);
+                            
+                            if (i === 0) ctx.moveTo(pointX, pointY);
+                            else ctx.lineTo(pointX, pointY);
+                          });
+                          ctx.stroke();
+                          
+                          // Draw points
+                          ctx.fillStyle = color;
+                          data.forEach((point, i) => {
+                            const pointX = plotX + (i * xScale);
+                            const pointY = plotY + plotHeight - (point[modelKey] * yScale);
+                            ctx.beginPath();
+                            ctx.arc(pointX, pointY, 3, 0, 2 * Math.PI);
+                            ctx.fill();
+                          });
+                        } else {
+                          // Bar chart for comparison
+                          const recentData = data.slice(-7);
+                          const maxValue = Math.max(...recentData.flatMap(d => [d.gfs, d.icon]));
+                          const yScale = plotHeight / (maxValue * 1.1);
+                          const barGroupWidth = plotWidth / recentData.length;
+                          const barWidth = barGroupWidth * 0.35;
+                          
+                          // Grid lines
+                          ctx.strokeStyle = '#f0f0f0';
+                          ctx.lineWidth = 1;
+                          for (let i = 0; i <= 5; i++) {
+                            const gridY = plotY + plotHeight - (i * plotHeight / 5);
+                            ctx.beginPath();
+                            ctx.moveTo(plotX, gridY);
+                            ctx.lineTo(plotX + plotWidth, gridY);
+                            ctx.stroke();
+                          }
+                          
+                          // Axes
+                          ctx.strokeStyle = '#333';
+                          ctx.lineWidth = 2;
+                          ctx.beginPath();
+                          ctx.moveTo(plotX, plotY);
+                          ctx.lineTo(plotX, plotY + plotHeight);
+                          ctx.moveTo(plotX, plotY + plotHeight);
+                          ctx.lineTo(plotX + plotWidth, plotY + plotHeight);
+                          ctx.stroke();
+                          
+                          // Y-axis labels
+                          ctx.fillStyle = '#666';
+                          ctx.font = '10px Arial';
+                          ctx.textAlign = 'right';
+                          for (let i = 0; i <= 5; i++) {
+                            const value = (maxValue * i) / 5;
+                            const labelY = plotY + plotHeight - (i * plotHeight / 5);
+                            ctx.fillText(value.toFixed(1), plotX - 10, labelY + 3);
+                          }
+                          
+                          // Y-axis title
+                          ctx.save();
+                          ctx.translate(plotX - 50, plotY + plotHeight / 2);
+                          ctx.rotate(-Math.PI / 2);
+                          ctx.font = 'bold 12px Arial';
+                          ctx.textAlign = 'center';
+                          ctx.fillText('Discharge (m³/s)', 0, 0);
+                          ctx.restore();
+                          
+                          // Draw bars
+                          recentData.forEach((dataPoint, i) => {
+                            const groupX = plotX + (i * barGroupWidth) + barGroupWidth * 0.1;
+                            
+                            // GFS bar
+                            const gfsHeight = dataPoint.gfs * yScale;
+                            ctx.fillStyle = '#1f77b4';
+                            ctx.fillRect(groupX, plotY + plotHeight - gfsHeight, barWidth, gfsHeight);
+                            
+                            // ICON bar
+                            const iconHeight = dataPoint.icon * yScale;
+                            ctx.fillStyle = '#ff7f0e';
+                            ctx.fillRect(groupX + barWidth + 2, plotY + plotHeight - iconHeight, barWidth, iconHeight);
+                            
+                            // Date label
+                            ctx.fillStyle = '#666';
+                            ctx.font = '9px Arial';
+                            ctx.textAlign = 'center';
+                            ctx.save();
+                            ctx.translate(groupX + barWidth, plotY + plotHeight + 15);
+                            ctx.rotate(-Math.PI / 6);
+                            ctx.fillText(dataPoint.time.toLocaleDateString('en-GB'), 0, 0);
+                            ctx.restore();
+                          });
+                        }
+                        ctx.textAlign = 'left';
+                      };
+                      
+                      // Draw charts
+                      drawProfessionalChart((canvas.width - chartWidth) / 2, 100, timeSeriesData, 'Model Comparison (Last 7 Days)', false);
+                      drawProfessionalChart(30, 380, timeSeriesData, 'GFS Model Forecast', true, 'gfs');
+                      drawProfessionalChart(630, 380, timeSeriesData, 'ICON Model Forecast', true, 'icon');
+                      
+                      // Legend
+                      const legendY = 650;
+                      ctx.fillStyle = '#1f77b4';
+                      ctx.fillRect(canvas.width / 2 - 80, legendY, 15, 15);
+                      ctx.fillStyle = '#333';
+                      ctx.font = '12px Arial';
+                      ctx.fillText('GFS Model', canvas.width / 2 - 60, legendY + 12);
+                      
+                      ctx.fillStyle = '#ff7f0e';
+                      ctx.fillRect(canvas.width / 2 + 10, legendY, 15, 15);
+                      ctx.fillText('ICON Model', canvas.width / 2 + 30, legendY + 12);
+                      
+                      const link = document.createElement('a');
+                      link.download = `${stationName}_forecast_analysis.png`;
+                      link.href = canvas.toDataURL();
+                      link.click();
+                      return;
+                    }
+                    
+                    // GeoSFM: Professional vertical stacked layout (depth and streamflow)
+                    if ((chartType === "riverdepth" || chartType === "streamflow") && geoFSMTimeSeriesData && geoFSMTimeSeriesData.length > 0) {
+                      const canvas = document.createElement('canvas');
+                      const ctx = canvas.getContext('2d');
+                      
+                      canvas.width = 1000;
+                      canvas.height = 900;
+                      
+                      // Fill background
+                      ctx.fillStyle = 'white';
+                      ctx.fillRect(0, 0, canvas.width, canvas.height);
+                      
+                      const stationName = selectedStation?.properties?.Name || selectedStation?.properties?.Descriptio || 'GeoSFM Station';
+                      
+                      // Header section with centered branding
+                      ctx.fillStyle = '#1B6840';
+                      ctx.font = 'bold 24px Arial';
+                      ctx.textAlign = 'center';
+                      ctx.fillText('IGAD-ICPAC East Africa Flood Watch', canvas.width / 2, 30);
+                      
+                      // Station title
+                      ctx.font = 'bold 18px Arial';
+                      ctx.fillText(`${stationName} - GeoSFM Monitoring Data`, canvas.width / 2, 60);
+                      
+                      // Generation date
+                      ctx.fillStyle = '#666';
+                      ctx.font = '12px Arial';
+                      ctx.fillText(`Generated: ${new Date().toLocaleDateString('en-GB', {day: 'numeric', month: 'long', year: 'numeric'})}`, canvas.width / 2, 80);
+                      
+                      ctx.textAlign = 'left';
+                      
+                      // Chart dimensions
+                      const chartWidth = 900;
+                      const chartHeight = 320;
+                      const margin = { top: 60, right: 120, bottom: 80, left: 80 };
+                      
+                      // Helper function to draw professional GeoSFM chart with legend
+                      const drawProfessionalGeoSFMChart = (x, y, dataKey, color, title, unit) => {
+                        // Plot area
+                        const plotX = x + margin.left;
+                        const plotY = y + margin.top;
+                        const plotWidth = chartWidth - margin.left - margin.right;
+                        const plotHeight = chartHeight - margin.top - margin.bottom;
+                        
+                        // Title
+                        ctx.fillStyle = '#333';
+                        ctx.font = 'bold 16px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(`${title} (${unit})`, x + chartWidth / 2, y + 25);
+                        ctx.textAlign = 'left';
+                        
+                        // Get data values
+                        const values = geoFSMTimeSeriesData.map(d => d[dataKey] || 0);
+                        const maxValue = Math.max(...values);
+                        const yScale = plotHeight / (maxValue * 1.1);
+                        const xScale = plotWidth / (geoFSMTimeSeriesData.length - 1);
+                        
+                        // Grid lines
+                        ctx.strokeStyle = '#f0f0f0';
+                        ctx.lineWidth = 1;
+                        for (let i = 0; i <= 6; i++) {
+                          const gridY = plotY + plotHeight - (i * plotHeight / 6);
+                          ctx.beginPath();
+                          ctx.moveTo(plotX, gridY);
+                          ctx.lineTo(plotX + plotWidth, gridY);
+                          ctx.stroke();
+                        }
+                        
+                        // Y-axis
+                        ctx.strokeStyle = '#333';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(plotX, plotY);
+                        ctx.lineTo(plotX, plotY + plotHeight);
+                        ctx.stroke();
+                        
+                        // X-axis
+                        ctx.beginPath();
+                        ctx.moveTo(plotX, plotY + plotHeight);
+                        ctx.lineTo(plotX + plotWidth, plotY + plotHeight);
+                        ctx.stroke();
+                        
+                        // Y-axis labels
+                        ctx.fillStyle = '#666';
+                        ctx.font = '11px Arial';
+                        ctx.textAlign = 'right';
+                        for (let i = 0; i <= 6; i++) {
+                          const value = (maxValue * i) / 6;
+                          const labelY = plotY + plotHeight - (i * plotHeight / 6);
+                          ctx.fillText(value.toFixed(1), plotX - 10, labelY + 4);
+                        }
+                        
+                        // Y-axis title
+                        ctx.save();
+                        ctx.translate(plotX - 50, plotY + plotHeight / 2);
+                        ctx.rotate(-Math.PI / 2);
+                        ctx.font = 'bold 12px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(`${title} (${unit})`, 0, 0);
+                        ctx.restore();
+                        
+                        // X-axis labels (dates)
+                        ctx.textAlign = 'center';
+                        ctx.font = '10px Arial';
+                        ctx.fillStyle = '#666';
+                        geoFSMTimeSeriesData.forEach((point, i) => {
+                          if (i % Math.ceil(geoFSMTimeSeriesData.length / 10) === 0) {
+                            const labelX = plotX + (i * xScale);
+                            const date = new Date(point.timestamp);
+                            const dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                            ctx.fillText(dateStr, labelX, plotY + plotHeight + 15);
+                          }
+                        });
+                        
+                        // X-axis title
+                        ctx.font = 'bold 12px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillStyle = '#333';
+                        ctx.fillText('Date', plotX + plotWidth / 2, plotY + plotHeight + 40);
+                        
+                        // Draw line
+                        ctx.strokeStyle = color;
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        
+                        geoFSMTimeSeriesData.forEach((point, i) => {
+                          const pointX = plotX + (i * xScale);
+                          const pointY = plotY + plotHeight - ((point[dataKey] || 0) * yScale);
+                          
+                          if (i === 0) ctx.moveTo(pointX, pointY);
+                          else ctx.lineTo(pointX, pointY);
+                        });
+                        ctx.stroke();
+                        
+                        // Draw points
+                        ctx.fillStyle = color;
+                        geoFSMTimeSeriesData.forEach((point, i) => {
+                          const pointX = plotX + (i * xScale);
+                          const pointY = plotY + plotHeight - ((point[dataKey] || 0) * yScale);
+                          ctx.beginPath();
+                          ctx.arc(pointX, pointY, 3, 0, 2 * Math.PI);
+                          ctx.fill();
+                        });
+                        
+                        // Legend box
+                        const legendX = plotX + plotWidth - 150;
+                        const legendY = plotY + 20;
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                        ctx.fillRect(legendX, legendY, 130, 30);
+                        ctx.strokeStyle = '#ddd';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(legendX, legendY, 130, 30);
+                        
+                        // Legend line
+                        ctx.strokeStyle = color;
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.moveTo(legendX + 10, legendY + 15);
+                        ctx.lineTo(legendX + 30, legendY + 15);
+                        ctx.stroke();
+                        
+                        // Legend text
+                        ctx.fillStyle = '#333';
+                        ctx.font = '12px Arial';
+                        ctx.textAlign = 'left';
+                        ctx.fillText(title, legendX + 35, legendY + 19);
+                        
+                        ctx.textAlign = 'left';
+                      };
+                      
+                      // Draw charts vertically stacked
+                      drawProfessionalGeoSFMChart(50, 120, 'depth', '#2196F3', 'River Depth', 'm');
+                      drawProfessionalGeoSFMChart(50, 480, 'streamflow', '#FF6B35', 'Streamflow', 'm³/s');
+                      
+                      const link = document.createElement('a');
+                      link.download = `${stationName}_geosfm_analysis.png`;
+                      link.href = canvas.toDataURL();
+                      link.click();
+                      return;
+                    }
+                  }}
+                  style={{
+                    padding: '4px 8px',
+                    backgroundColor: '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  📸 PNG
+                </button>
+                
+                <button
+                  className="close-button"
+                  onClick={() => {
+                    setShowChart(false);
+                    setSelectedStation(null);
+                    setTimeSeriesData([]);
+                    setGeoFSMTimeSeriesData([]);
+                  }}
+                >
+                  ×
+                </button>
+              </div>
             </div>
             {chartType === "riverdepth" || chartType === "streamflow" ? (
               <GeoSFMChart
                 timeSeriesData={geoFSMTimeSeriesData}
                 dataType={geoFSMDataType}
+                stationName={selectedStation?.properties?.Name || selectedStation?.properties?.Descriptio || 'GeoSFM Station'}
               />
             ) : (
               <div>
@@ -1428,10 +2009,17 @@ const MapViewer = () => {
                     <option value="icon">ICON Only</option>
                   </select>
                 </div>
-                <DischargeChart
-                  timeSeriesData={timeSeriesData}
-                  selectedSeries={selectedSeries}
-                />
+                {timeSeriesData && timeSeriesData.length > 0 ? (
+                  <DischargeChart
+                    timeSeriesData={timeSeriesData}
+                    selectedSeries={selectedSeries}
+                    stationName={selectedStation?.properties?.SEC_NAME || 'FloodProofs Station'}
+                  />
+                ) : (
+                  <div style={{ padding: '20px', textAlign: 'center' }}>
+                    <p>Loading chart data... ({timeSeriesData?.length || 0} data points)</p>
+                  </div>
+                )}
               </div>
             )}
           </div>

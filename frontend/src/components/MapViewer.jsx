@@ -439,10 +439,10 @@ const TabSidebar = ({
   setShowMonitoringStations,
   showGeoFSM,
   setShowGeoFSM,
-  selectedStation,
+  geoFSMLoading,
   selectedYear,
   setSelectedYear,
-  availableYears,
+  selectedStation,
   showMikeHydro,
   setShowMikeHydro,
   showFastFlood,
@@ -518,19 +518,34 @@ const TabSidebar = ({
                     </div>
                     <InfoIcon layerName="GeoSFM" onClick={onInfoClick} />
                   </div>
-                  {showGeoFSM && (
-                    <select
-                      value={selectedYear}
-                      onChange={(e) => setSelectedYear(e.target.value)}
-                      className="form-select mt-2"
-                      style={{ fontSize: "14px", marginLeft: "38px" }}
-                    >
-                      {availableYears.map((year) => (
-                        <option key={year} value={year}>
-                          {year}
-                        </option>
-                      ))}
-                    </select>
+                  {showGeoFSM && geoFSMLoading && (
+                    <div style={{ marginLeft: "38px", marginTop: "8px" }}>
+                      <div className="spinner-border spinner-border-sm text-primary" role="status">
+                        <span className="visually-hidden">Loading GeoSFM data...</span>
+                      </div>
+                      <small className="text-muted ms-2">Loading GeoSFM data...</small>
+                    </div>
+                  )}
+                  {showGeoFSM && !geoFSMLoading && (
+                    <div style={{ marginLeft: "38px", marginTop: "8px" }}>
+                      <label htmlFor="year-select" style={{ fontSize: "0.875rem", marginRight: "8px" }}>
+                        Year:
+                      </label>
+                      <select
+                        id="year-select"
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(e.target.value)}
+                        style={{ 
+                          fontSize: "0.875rem", 
+                          padding: "2px 4px",
+                          borderRadius: "4px",
+                          border: "1px solid #ccc"
+                        }}
+                      >
+                        <option value="2025">2025</option>
+                        <option value="2024">2024</option>
+                      </select>
+                    </div>
                   )}
                 </div>
               </ListGroup.Item>
@@ -768,10 +783,16 @@ const MapViewer = () => {
   const [chartType, setChartType] = useState("discharge");
   const [geoFSMDataType, setGeoFSMDataType] = useState("riverdepth");
   const [selectedSeries, setSelectedSeries] = useState("both");
-  const [selectedYear, setSelectedYear] = useState("2023");
   const [availableDataTypes, setAvailableDataTypes] = useState([]);
-  const [availableYears, setAvailableYears] = useState(["2023"]);
-  const [isLayerControlVisible, setIsLayerControlVisible] = useState(false);
+  const [geoFSMLoading, setGeoFSMLoading] = useState(false);
+  const [selectedYear, setSelectedYear] = useState("2025");
+  const [panelHeight, setPanelHeight] = useState(320);
+  const [panelWidth, setPanelWidth] = useState(600);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeDirection, setResizeDirection] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [panelPosition, setPanelPosition] = useState({ x: 0, y: 0 });
   
   // State for metadata modal
   const [showMetadataModal, setShowMetadataModal] = useState(false);
@@ -865,38 +886,29 @@ const MapViewer = () => {
 
   useEffect(() => {
     if (showGeoFSM) {
+      setGeoFSMLoading(true);
       fetch("hydro_data_with_locations.geojson")
         .then((response) => response.json())
         .then((data) => {
-          const years = [
-            ...new Set(
-              data.features.map((f) =>
-                new Date(f.properties.timestamp).getFullYear(),
-              ),
-            ),
-          ].sort();
-          setAvailableYears(years);
-          setSelectedYear(years[0]?.toString() || "2023");
-
+          // Filter for selected year data only to improve performance
           const filteredData = {
             ...data,
-            features: data.features.filter(
-              (f) =>
-                new Date(f.properties.timestamp).getFullYear().toString() ===
-                selectedYear,
-            ),
+            features: data.features.filter((feature) => {
+              return feature.properties.timestamp?.startsWith(selectedYear);
+            })
           };
-          data.features.forEach((feature) => {
+          
+          filteredData.features.forEach((feature) => {
             if (feature.geometry?.coordinates) {
               feature.properties.latitude = feature.geometry.coordinates[1];
               feature.properties.longitude = feature.geometry.coordinates[0];
             }
           });
-          setGeoFSMData(data);
+          setGeoFSMData(filteredData);
           const validTypes = ["riverdepth", "streamflow"];
           const dataTypes = [
             ...new Set(
-              data.features
+              filteredData.features
                 .map((f) => f.properties.data_type)
                 .filter((type) => type && validTypes.includes(type)),
             ),
@@ -906,7 +918,7 @@ const MapViewer = () => {
           );
           setGeoFSMDataType(dataTypes[0] || "riverdepth");
 
-          const allTimeSeries = data.features
+          const allTimeSeries = filteredData.features
             .reduce((acc, f) => {
               const timestamp = new Date(f.properties.timestamp);
               if (isNaN(timestamp.getTime())) return acc;
@@ -935,15 +947,164 @@ const MapViewer = () => {
             }, [])
             .sort((a, b) => a.timestamp - b.timestamp);
           setGeoFSMTimeSeriesData(allTimeSeries);
+          setGeoFSMLoading(false);
         })
-        .catch((error) => console.error("Error loading GeoSFM data:", error));
+        .catch((error) => {
+          console.error("Error loading GeoSFM data:", error);
+          setGeoFSMLoading(false);
+        });
     } else {
       setGeoFSMData(null);
       setGeoFSMTimeSeriesData([]);
       setAvailableDataTypes([]);
       setSelectedStation(null);
+      setGeoFSMLoading(false);
     }
-  }, [showGeoFSM]);
+  }, [showGeoFSM, selectedYear]);
+
+  // Handle panel resizing
+  const handleResizeStart = (direction, e) => {
+    setIsResizing(true);
+    setResizeDirection(direction);
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleMouseMove = useCallback((e) => {
+    if (!isResizing || !resizeDirection) return;
+    
+    const rect = document.querySelector('.bottom-panel').getBoundingClientRect();
+    const minWidth = 400;
+    const maxWidth = window.innerWidth - 100;
+    const minHeight = 200;
+    const maxHeight = window.innerHeight - 150;
+    
+    let newWidth = panelWidth;
+    let newHeight = panelHeight;
+    let newX = panelPosition.x;
+    let newY = panelPosition.y;
+    
+    switch(resizeDirection) {
+      case 'top':
+        newHeight = rect.bottom - e.clientY;
+        newY = e.clientY - 80;
+        break;
+      case 'bottom':
+        newHeight = e.clientY - rect.top;
+        break;
+      case 'left':
+        newWidth = rect.right - e.clientX;
+        newX = e.clientX - (isSidebarActive ? 350 : 0);
+        break;
+      case 'right':
+        newWidth = e.clientX - rect.left;
+        break;
+      case 'top-left':
+        newHeight = rect.bottom - e.clientY;
+        newWidth = rect.right - e.clientX;
+        newY = e.clientY - 80;
+        newX = e.clientX - (isSidebarActive ? 350 : 0);
+        break;
+      case 'top-right':
+        newHeight = rect.bottom - e.clientY;
+        newWidth = e.clientX - rect.left;
+        newY = e.clientY - 80;
+        break;
+      case 'bottom-left':
+        newHeight = e.clientY - rect.top;
+        newWidth = rect.right - e.clientX;
+        newX = e.clientX - (isSidebarActive ? 350 : 0);
+        break;
+      case 'bottom-right':
+        newHeight = e.clientY - rect.top;
+        newWidth = e.clientX - rect.left;
+        break;
+    }
+    
+    if (newWidth >= minWidth && newWidth <= maxWidth) {
+      setPanelWidth(newWidth);
+      if (['left', 'top-left', 'bottom-left'].includes(resizeDirection)) {
+        setPanelPosition(prev => ({ ...prev, x: newX }));
+      }
+    }
+    
+    if (newHeight >= minHeight && newHeight <= maxHeight) {
+      setPanelHeight(newHeight);
+      if (['top', 'top-left', 'top-right'].includes(resizeDirection)) {
+        setPanelPosition(prev => ({ ...prev, y: newY }));
+      }
+    }
+  }, [isResizing, resizeDirection, panelWidth, panelHeight, panelPosition, isSidebarActive]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false);
+    setResizeDirection(null);
+  }, []);
+
+  // Handle panel dragging
+  const handleDragStart = (e) => {
+    setIsDragging(true);
+    const rect = e.currentTarget.closest('.bottom-panel').getBoundingClientRect();
+    setDragOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    });
+    e.preventDefault();
+  };
+
+  const handleDragMove = useCallback((e) => {
+    if (!isDragging) return;
+    
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    const sidebarWidth = isSidebarActive ? (isMobile ? 0 : 350) : 0;
+    
+    const newX = Math.max(sidebarWidth, Math.min(windowWidth - 400, e.clientX - dragOffset.x));
+    const newY = Math.max(80, Math.min(windowHeight - panelHeight - 30, e.clientY - dragOffset.y));
+    
+    setPanelPosition({ x: newX - sidebarWidth, y: newY });
+  }, [isDragging, dragOffset, panelHeight, isSidebarActive, isMobile]);
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      
+      const cursorMap = {
+        'top': 'ns-resize',
+        'bottom': 'ns-resize',
+        'left': 'ew-resize', 
+        'right': 'ew-resize',
+        'top-left': 'nw-resize',
+        'top-right': 'ne-resize',
+        'bottom-left': 'sw-resize',
+        'bottom-right': 'se-resize'
+      };
+      
+      document.body.style.cursor = cursorMap[resizeDirection] || 'default';
+      document.body.style.userSelect = 'none';
+    }
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleDragMove);
+      document.addEventListener('mouseup', handleDragEnd);
+      document.body.style.cursor = 'move';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousemove', handleDragMove);
+      document.removeEventListener('mouseup', handleDragEnd);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing, resizeDirection, isDragging, handleMouseMove, handleMouseUp, handleDragMove, handleDragEnd]);
 
   // Enhanced layer selection with proper date handling
   const handleLayerSelection = useCallback(
@@ -1021,9 +1182,15 @@ const MapViewer = () => {
       }
 
       const dataType = feature.properties.data_type || "discharge";
-      console.log("Data type:", dataType);
-      setChartType(dataType);
-      setGeoFSMDataType(dataType === "discharge" ? "riverdepth" : dataType);
+      
+      // For GeoSFM data, set chartType to indicate we're in GeoSFM mode
+      if (dataType === "riverdepth" || dataType === "streamflow") {
+        setChartType("riverdepth"); // Use riverdepth as the general GeoSFM indicator
+        setGeoFSMDataType(dataType); // Set the specific data type
+      } else {
+        setChartType(dataType);
+        setGeoFSMDataType(dataType === "discharge" ? "riverdepth" : dataType);
+      }
 
       try {
         if (dataType === "riverdepth" || dataType === "streamflow") {
@@ -1059,7 +1226,23 @@ const MapViewer = () => {
               .sort((a, b) => a.timestamp - b.timestamp) || [];
           setGeoFSMTimeSeriesData(timeSeries);
           setTimeSeriesData([]);
+          
+          // Set available data types based on the selected station's data
+          const stationDataTypes = [
+            ...new Set(
+              geoFSMData?.features
+                ?.filter((f) => f.properties.Id === feature.properties.Id)
+                .map((f) => f.properties.data_type)
+                .filter((type) => type && ["riverdepth", "streamflow"].includes(type))
+            )
+          ];
+          setAvailableDataTypes(stationDataTypes.length > 0 ? stationDataTypes : ["riverdepth"]);
         } else {
+          console.log("Processing FloodPROOFS station:", feature?.properties?.SEC_NAME);
+          console.log("Raw time period:", feature.properties.time_period);
+          console.log("Raw GFS data:", feature.properties["time_series_discharge_simulated-gfs"]);
+          console.log("Raw ICON data:", feature.properties["time_series_discharge_simulated-icon"]);
+          
           const timePeriod =
             feature.properties.time_period?.split(",")?.map((t) => t.trim()) ||
             [];
@@ -1071,6 +1254,8 @@ const MapViewer = () => {
             feature.properties["time_series_discharge_simulated-icon"]
               ?.split(",")
               .map((val) => Number(val.trim()) || 0) || [];
+              
+          console.log("Parsed arrays - time:", timePeriod.length, "gfs:", gfsValues.length, "icon:", iconValues.length);
 
           const rawData = timePeriod
             .map((time, index) => ({
@@ -1084,6 +1269,9 @@ const MapViewer = () => {
                 !isNaN(item.gfs) &&
                 !isNaN(item.icon),
             );
+            
+          console.log("Raw data before filtering:", rawData.length);
+          console.log("Sample raw data:", rawData.slice(0, 3));
 
           // Aggregate data by day (daily averages)
           const dailyData = rawData.reduce((acc, item) => {
@@ -1171,10 +1359,10 @@ const MapViewer = () => {
           setShowMonitoringStations={setShowMonitoringStations}
           showGeoFSM={showGeoFSM}
           setShowGeoFSM={setShowGeoFSM}
-          selectedStation={selectedStation}
+          geoFSMLoading={geoFSMLoading}
           selectedYear={selectedYear}
           setSelectedYear={setSelectedYear}
-          availableYears={availableYears}
+          selectedStation={selectedStation}
           showMikeHydro={showMikeHydro}
           setShowMikeHydro={setShowMikeHydro}
           showFastFlood={showFastFlood}
@@ -1187,7 +1375,9 @@ const MapViewer = () => {
         />
       </div>
       <div className={`main-content ${isMobile ? 'mobile-content' : ''}`}>
-        <div className="map-container">
+        <div className="map-container" style={{
+          bottom: (showChart && !panelPosition.x && !panelPosition.y) ? `${panelHeight + 30}px` : '30px'
+        }}>
           <MapContainer
             center={MAP_CONFIG.initialPosition}
             zoom={MAP_CONFIG.initialZoom}
@@ -1266,65 +1456,49 @@ const MapViewer = () => {
               )
             )}
             
-            <div
-              className="toggle-label"
-              onClick={() => setIsLayerControlVisible(!isLayerControlVisible)}
-            >
-              Flood Watch
-            </div>
-            <div
-              className={`layer-control-panel ${isLayerControlVisible ? "visible" : ""}`}
-            >
-              <button
-                className="layer-control-close-btn"
-                onClick={() => setIsLayerControlVisible(false)}
-              >
-                Close
-              </button>
-              <LayersControl position="topright">
-                {BASE_MAPS.map((basemap) => (
-                  <LayersControl.BaseLayer
-                    key={basemap.name}
-                    name={basemap.name}
-                    checked={basemap.name === "ICPAC"}
-                  >
-                    <TileLayer
-                      url={basemap.url}
-                      attribution={basemap.attribution}
-                    />
-                  </LayersControl.BaseLayer>
-                ))}
-                
-                {/* Boundary layers in layer control */}
-                {BOUNDARY_LAYERS.map((layer) => (
-                  <LayersControl.Overlay
-                    key={layer.layer}
-                    name={layer.name}
-                    checked={selectedBoundaryLayers.has(layer.layer)}
-                  >
-                    <WMSTileLayer
-                      url={MAP_CONFIG.mapserverWMSUrl}
-                      layers={layer.layer}
-                      format="image/png"
-                      transparent={true}
-                      version="1.1.0"
-                      eventHandlers={{
-                        add: () => setSelectedBoundaryLayers(prev => new Set([...prev, layer.layer])),
-                        remove: () => {
-                          if (layer.layer !== 'admin_level_1') {
-                            setSelectedBoundaryLayers(prev => {
-                              const newLayers = new Set(prev);
-                              newLayers.delete(layer.layer);
-                              return newLayers;
-                            });
-                          }
+            <LayersControl position="topright">
+              {BASE_MAPS.map((basemap) => (
+                <LayersControl.BaseLayer
+                  key={basemap.name}
+                  name={basemap.name}
+                  checked={basemap.name === "ICPAC"}
+                >
+                  <TileLayer
+                    url={basemap.url}
+                    attribution={basemap.attribution}
+                  />
+                </LayersControl.BaseLayer>
+              ))}
+              
+              {/* Boundary layers in layer control */}
+              {BOUNDARY_LAYERS.map((layer) => (
+                <LayersControl.Overlay
+                  key={layer.layer}
+                  name={layer.name}
+                  checked={selectedBoundaryLayers.has(layer.layer)}
+                >
+                  <WMSTileLayer
+                    url={MAP_CONFIG.mapserverWMSUrl}
+                    layers={layer.layer}
+                    format="image/png"
+                    transparent={true}
+                    version="1.1.0"
+                    eventHandlers={{
+                      add: () => setSelectedBoundaryLayers(prev => new Set([...prev, layer.layer])),
+                      remove: () => {
+                        if (layer.layer !== 'admin_level_1') {
+                          setSelectedBoundaryLayers(prev => {
+                            const newLayers = new Set(prev);
+                            newLayers.delete(layer.layer);
+                            return newLayers;
+                          });
                         }
-                      }}
-                    />
-                  </LayersControl.Overlay>
-                ))}
-              </LayersControl>
-            </div>
+                      }
+                    }}
+                  />
+                </LayersControl.Overlay>
+              ))}
+            </LayersControl>
             
             {showMonitoringStations && monitoringData?.features && (
               <GeoJSON
@@ -1408,45 +1582,245 @@ const MapViewer = () => {
         {showChart && (
           <div className={`bottom-panel ${isMobile && isSidebarActive ? 'with-sidebar' : ''}`} style={{
             position: 'fixed',
-            bottom: '0px',
-            left: isSidebarActive ? '350px' : '0px',
-            right: '0px',
-            height: '350px',
+            bottom: panelPosition.y ? 'auto' : '30px',
+            top: panelPosition.y ? `${panelPosition.y}px` : 'auto',
+            left: `${(isSidebarActive ? (isMobile ? 0 : 350) : 0) + panelPosition.x}px`,
+            right: (panelPosition.x || panelPosition.y) ? 'auto' : '0px',
+            width: (panelPosition.x || panelPosition.y) ? `${panelWidth}px` : 'auto',
+            height: `${panelHeight}px`,
             backgroundColor: 'white',
             border: '1px solid #ddd',
             borderBottom: 'none',
+            borderTop: '2px solid #1B6840',
             boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.15)',
-            zIndex: 900,
-            display: 'block'
+            zIndex: 1100,
+            display: 'block',
+            borderRadius: (panelPosition.x || panelPosition.y) ? '8px' : '0'
           }}>
-            <div className="chart-header">
-              <h5>
-                {selectedStation?.properties?.SEC_NAME ||
-                  (chartType === "riverdepth"
-                    ? "GeoSFM River Depth"
-                    : chartType === "streamflow"
-                      ? "GeoSFM Streamflow"
+            {/* Resize Handles - only show when panel is dragged/floating */}
+            {(panelPosition.x || panelPosition.y) && (
+              <>
+                {/* Top */}
+                <div
+                  onMouseDown={(e) => handleResizeStart('top', e)}
+                  style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    left: '8px',
+                    right: '8px',
+                    height: '8px',
+                    cursor: 'ns-resize',
+                    backgroundColor: 'transparent',
+                    zIndex: 902
+                  }}
+                />
+                {/* Bottom */}
+                <div
+                  onMouseDown={(e) => handleResizeStart('bottom', e)}
+                  style={{
+                    position: 'absolute',
+                    bottom: '-4px',
+                    left: '8px',
+                    right: '8px',
+                    height: '8px',
+                    cursor: 'ns-resize',
+                    backgroundColor: 'transparent',
+                    zIndex: 902
+                  }}
+                />
+                {/* Left */}
+                <div
+                  onMouseDown={(e) => handleResizeStart('left', e)}
+                  style={{
+                    position: 'absolute',
+                    left: '-4px',
+                    top: '8px',
+                    bottom: '8px',
+                    width: '8px',
+                    cursor: 'ew-resize',
+                    backgroundColor: 'transparent',
+                    zIndex: 902
+                  }}
+                />
+                {/* Right */}
+                <div
+                  onMouseDown={(e) => handleResizeStart('right', e)}
+                  style={{
+                    position: 'absolute',
+                    right: '-4px',
+                    top: '8px',
+                    bottom: '8px',
+                    width: '8px',
+                    cursor: 'ew-resize',
+                    backgroundColor: 'transparent',
+                    zIndex: 902
+                  }}
+                />
+                {/* Top-Left Corner */}
+                <div
+                  onMouseDown={(e) => handleResizeStart('top-left', e)}
+                  style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    left: '-4px',
+                    width: '12px',
+                    height: '12px',
+                    cursor: 'nw-resize',
+                    backgroundColor: 'transparent',
+                    zIndex: 903
+                  }}
+                />
+                {/* Top-Right Corner */}
+                <div
+                  onMouseDown={(e) => handleResizeStart('top-right', e)}
+                  style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    width: '12px',
+                    height: '12px',
+                    cursor: 'ne-resize',
+                    backgroundColor: 'transparent',
+                    zIndex: 903
+                  }}
+                />
+                {/* Bottom-Left Corner */}
+                <div
+                  onMouseDown={(e) => handleResizeStart('bottom-left', e)}
+                  style={{
+                    position: 'absolute',
+                    bottom: '-4px',
+                    left: '-4px',
+                    width: '12px',
+                    height: '12px',
+                    cursor: 'sw-resize',
+                    backgroundColor: 'transparent',
+                    zIndex: 903
+                  }}
+                />
+                {/* Bottom-Right Corner */}
+                <div
+                  onMouseDown={(e) => handleResizeStart('bottom-right', e)}
+                  style={{
+                    position: 'absolute',
+                    bottom: '-4px',
+                    right: '-4px',
+                    width: '12px',
+                    height: '12px',
+                    cursor: 'se-resize',
+                    backgroundColor: 'transparent',
+                    zIndex: 903
+                  }}
+                />
+              </>
+            )}
+            
+            {/* Original resize handle for docked position */}
+            {!panelPosition.x && !panelPosition.y && (
+              <div
+                onMouseDown={(e) => handleResizeStart('top', e)}
+                style={{
+                  position: 'absolute',
+                  top: '-5px',
+                  left: '0',
+                  right: '0',
+                  height: '10px',
+                  cursor: 'ns-resize',
+                  backgroundColor: 'transparent',
+                  zIndex: 901,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <div style={{
+                  width: '80px',
+                  height: '4px',
+                  backgroundColor: '#ccc',
+                  borderRadius: '2px',
+                  transition: 'background-color 0.2s'
+                }} 
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#999'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#ccc'}
+                />
+              </div>
+            )}
+            <div 
+              className="chart-header" 
+              onMouseDown={handleDragStart}
+              style={{
+                cursor: 'move',
+                userSelect: 'none',
+                background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+                borderBottom: '1px solid #ddd'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '2px',
+                  opacity: 0.6 
+                }}>
+                  <div style={{ width: '4px', height: '4px', backgroundColor: '#666', borderRadius: '50%' }}></div>
+                  <div style={{ width: '4px', height: '4px', backgroundColor: '#666', borderRadius: '50%' }}></div>
+                  <div style={{ width: '4px', height: '4px', backgroundColor: '#666', borderRadius: '50%' }}></div>
+                </div>
+                <h5 style={{ margin: 0 }}>
+                  {selectedStation?.properties?.SEC_NAME ||
+                    (chartType === "riverdepth" || chartType === "streamflow"
+                      ? `${selectedStation?.properties?.Name || selectedStation?.properties?.Descriptio || 'GeoSFM Station'} - ${geoFSMDataType === 'riverdepth' ? 'River Depth' : 'Streamflow'}`
                       : "Discharge Forecast")}
-              </h5>
+                </h5>
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 {(chartType === "riverdepth" || chartType === "streamflow") && (
-                  <div className="chart-controls">
-                    {availableDataTypes.length > 1 && (
-                      <select
-                        value={geoFSMDataType}
-                        onChange={(e) => {
-                          setGeoFSMDataType(e.target.value);
-                          setChartType(e.target.value);
-                        }}
-                        style={{ marginRight: "10px" }}
-                      >
-                        {availableDataTypes.map((type) => (
-                          <option key={type} value={type}>
-                            {type === "riverdepth" ? "River Depth" : "Streamflow"}
-                          </option>
-                        ))}
-                      </select>
-                    )}
+                  <div 
+                    className="chart-controls" 
+                    style={{ zIndex: 1000, position: 'relative' }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <select
+                      value={geoFSMDataType}
+                      onChange={(e) => {
+                        setGeoFSMDataType(e.target.value);
+                      }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = "#BBDEFB";
+                        e.target.style.borderColor = "#0D47A1";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = "#E3F2FD";
+                        e.target.style.borderColor = "#1976D2";
+                      }}
+                      style={{ 
+                        marginRight: "10px", 
+                        padding: "6px 12px",
+                        border: "2px solid #1976D2",
+                        borderRadius: "4px",
+                        backgroundColor: "#E3F2FD",
+                        color: "#1976D2",
+                        fontWeight: "500",
+                        minWidth: "140px",
+                        fontSize: "14px",
+                        cursor: "pointer",
+                        zIndex: 1001,
+                        position: "relative",
+                        pointerEvents: "auto",
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                        transition: "all 0.2s ease"
+                      }}
+                    >
+                      <option value="riverdepth">River Depth</option>
+                      <option value="streamflow">Streamflow</option>
+                    </select>
                   </div>
                 )}
                 
@@ -1990,38 +2364,68 @@ const MapViewer = () => {
                 </button>
               </div>
             </div>
-            {chartType === "riverdepth" || chartType === "streamflow" ? (
-              <GeoSFMChart
-                timeSeriesData={geoFSMTimeSeriesData}
-                dataType={geoFSMDataType}
-                stationName={selectedStation?.properties?.Name || selectedStation?.properties?.Descriptio || 'GeoSFM Station'}
-              />
-            ) : (
-              <div>
-                <div className="chart-controls mb-2">
-                  <select
-                    value={selectedSeries}
-                    onChange={(e) => setSelectedSeries(e.target.value)}
-                    className="chart-select"
-                  >
-                    <option value="both">Both GFS & ICON</option>
-                    <option value="gfs">GFS Only</option>
-                    <option value="icon">ICON Only</option>
-                  </select>
-                </div>
-                {timeSeriesData && timeSeriesData.length > 0 ? (
-                  <DischargeChart
-                    timeSeriesData={timeSeriesData}
-                    selectedSeries={selectedSeries}
-                    stationName={selectedStation?.properties?.SEC_NAME || 'FloodProofs Station'}
-                  />
-                ) : (
-                  <div style={{ padding: '20px', textAlign: 'center' }}>
-                    <p>Loading chart data... ({timeSeriesData?.length || 0} data points)</p>
+            <div className="chart-container" style={{ 
+              height: `${Math.max(panelHeight - 45, 155)}px`, 
+              width: '100%', 
+              padding: '0 20px 10px 20px',
+              overflow: 'hidden'
+            }}>
+              {chartType === "riverdepth" || chartType === "streamflow" ? (
+                <GeoSFMChart
+                  timeSeriesData={geoFSMTimeSeriesData}
+                  dataType={geoFSMDataType}
+                  stationName={selectedStation?.properties?.Name || selectedStation?.properties?.Descriptio || 'GeoSFM Station'}
+                  height={Math.max(panelHeight - 65, 135)}
+                />
+              ) : (
+                <div>
+                  <div className="chart-controls mb-2" style={{ marginBottom: '10px' }}>
+                    <select
+                      value={selectedSeries}
+                      onChange={(e) => setSelectedSeries(e.target.value)}
+                      className="chart-select"
+                      style={{ 
+                        fontSize: '14px', 
+                        padding: '6px 12px',
+                        border: '2px solid #2196F3',
+                        borderRadius: '4px',
+                        backgroundColor: '#E3F2FD',
+                        color: '#2196F3',
+                        fontWeight: '500',
+                        minWidth: '140px',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = '#BBDEFB';
+                        e.target.style.borderColor = '#1565C0';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = '#E3F2FD';
+                        e.target.style.borderColor = '#2196F3';
+                      }}
+                    >
+                      <option value="both">Both GFS & ICON</option>
+                      <option value="gfs">GFS Only</option>
+                      <option value="icon">ICON Only</option>
+                    </select>
                   </div>
-                )}
-              </div>
-            )}
+                  {timeSeriesData && timeSeriesData.length > 0 ? (
+                    <DischargeChart
+                      timeSeriesData={timeSeriesData}
+                      selectedSeries={selectedSeries}
+                      stationName={selectedStation?.properties?.SEC_NAME || 'FloodProofs Station'}
+                      height={Math.max(panelHeight - 105, 115)}
+                    />
+                  ) : (
+                    <div style={{ padding: '20px', textAlign: 'center' }}>
+                      <p>Loading chart data... ({timeSeriesData?.length || 0} data points)</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

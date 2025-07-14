@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend as RechartsLegend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend as RechartsLegend, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 // Export functions
 const exportToCSV = (data, filename, stationName = '') => {
@@ -58,7 +58,7 @@ const exportToPNG = (chartRef, filename, stationName = '') => {
 };
 
 // Component to render a discharge forecast chart
-export const DischargeChart = ({ timeSeriesData, selectedSeries = 'both', stationName = '', onSeriesChange }) => {
+export const DischargeChart = ({ timeSeriesData, selectedSeries = 'both', stationName = '', onSeriesChange, height = 300 }) => {
   const chartRef = useRef(null);
   console.log("DischargeChart received data:", timeSeriesData?.length, "points, series:", selectedSeries);
   
@@ -75,21 +75,110 @@ export const DischargeChart = ({ timeSeriesData, selectedSeries = 'both', statio
     (selectedSeries === 'gfs' && !isNaN(item.gfs)) ||
     (selectedSeries === 'icon' && !isNaN(item.icon))
   );
+  
+  // Log first data point to see date format
+  if (processedData.length > 0) {
+    console.log("First data point:", processedData[0].time, "Type:", typeof processedData[0].time);
+  }
 
   // Calculate Y-axis domain for better scaling
   const allValues = processedData.flatMap(item => [item.gfs, item.icon].filter(v => v != null && !isNaN(v)));
   const minValue = Math.min(...allValues);
   const maxValue = Math.max(...allValues);
-  const padding = (maxValue - minValue) * 0.1;
-  const yDomain = [Math.max(0, minValue - padding), maxValue + padding];
+  const range = maxValue - minValue;
+  
+  // Adjust padding based on the range to ensure visibility of small differences
+  let padding;
+  if (range < 0.1) {
+    padding = range * 0.5; // 50% padding for very small ranges
+  } else if (range < 1) {
+    padding = range * 0.3; // 30% padding for small ranges
+  } else {
+    padding = range * 0.1; // 10% padding for normal ranges
+  }
+  
+  // Ensure minimum visible range
+  const minRange = 0.05;
+  let yDomain;
+  if (range < minRange) {
+    const center = (minValue + maxValue) / 2;
+    const adjustedMin = center - minRange / 2;
+    const adjustedMax = center + minRange / 2;
+    yDomain = [Math.max(0, adjustedMin), adjustedMax];
+  } else {
+    yDomain = [Math.max(0, minValue - padding), maxValue + padding];
+  }
 
+  // Calculate appropriate tick values to avoid duplicates
+  const calculateTicks = (domain) => {
+    const [min, max] = domain;
+    const range = max - min;
+    let targetTickCount = 5;
+    
+    // For very small ranges, reduce tick count to avoid crowding
+    if (range < 0.1) targetTickCount = 4;
+    if (range < 0.05) targetTickCount = 3;
+    
+    // Calculate the step size
+    let step = range / (targetTickCount - 1);
+    
+    // Determine the precision needed based on the step size
+    let precision = 0;
+    if (step < 0.001) precision = 4;
+    else if (step < 0.01) precision = 3;
+    else if (step < 0.1) precision = 2;
+    else if (step < 1) precision = 1;
+    
+    // Round step to avoid floating point issues
+    const factor = Math.pow(10, precision);
+    step = Math.ceil(step * factor) / factor;
+    
+    // Generate ticks starting from a rounded minimum
+    const ticks = [];
+    const roundedMin = Math.floor(min * factor) / factor;
+    
+    for (let i = 0; i < targetTickCount; i++) {
+      const tickValue = roundedMin + (i * step);
+      if (tickValue <= max) {
+        // Round to avoid floating point precision issues
+        const roundedTick = Math.round(tickValue * factor) / factor;
+        ticks.push(roundedTick);
+      }
+    }
+    
+    // Remove any duplicates (this handles edge cases)
+    const uniqueTicks = [...new Set(ticks.map(t => t.toFixed(precision)))].map(Number);
+    
+    // Ensure we have at least 2 ticks
+    if (uniqueTicks.length < 2) {
+      return [min, max];
+    }
+    
+    return uniqueTicks;
+  };
+
+  const yTicks = calculateTicks(yDomain);
+
+  // Get current date for reference line - July 13, 2025
+  const currentDate = new Date(2025, 6, 13, 12, 0, 0); // Month is 0-indexed, so 6 = July, set to noon
+  
+  // Find the closest data point to today for better alignment
+  let closestDataPoint = null;
+  if (processedData.length > 0) {
+    closestDataPoint = processedData.reduce((prev, curr) => {
+      return Math.abs(curr.time - currentDate) < Math.abs(prev.time - currentDate) ? curr : prev;
+    });
+  }
+  
   console.log("Processed chart data:", processedData.length, "points");
+  console.log("Current date for reference line:", currentDate);
+  console.log("Closest data point:", closestDataPoint);
 
 
   return (
     <div className="chart-container" ref={chartRef}>
-      <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={processedData} margin={{ top: 20, right: 30, left: 70, bottom: 80 }}>
+      <ResponsiveContainer width="100%" height={height}>
+        <LineChart data={processedData} margin={{ top: 25, right: 20, left: 50, bottom: 60 }}>
             <defs>
               <linearGradient id="gfsGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#1f77b4" stopOpacity={0.3}/>
@@ -105,25 +194,54 @@ export const DischargeChart = ({ timeSeriesData, selectedSeries = 'both', statio
               dataKey="time" 
               angle={-45} 
               textAnchor="end" 
-              height={100} 
-              tickFormatter={(dt) => dt.toLocaleDateString('en-GB')} 
-              minTickGap={50}
+              height={60} 
+              tickFormatter={(dt) => {
+                const date = new Date(dt);
+                return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+              }} 
+              minTickGap={40}
               stroke="#666"
-              fontSize={12}
+              fontSize={10}
             />
             <YAxis 
               domain={yDomain}
+              ticks={yTicks}
               label={{ 
                 value: 'Discharge (m³/s)', 
                 angle: -90, 
                 position: 'insideLeft', 
-                offset: -10, 
-                dy: 60, 
-                style: { fontSize: '12px', fontWeight: 'bold', fill: '#333' } 
+                offset: 15, 
+                style: { textAnchor: 'middle', fontSize: '13px', fill: '#333' } 
               }}
               stroke="#666"
-              fontSize={12}
-              tickFormatter={(value) => Number(value).toFixed(1)}
+              fontSize={11}
+              tickFormatter={(value) => {
+                const num = Number(value);
+                if (isNaN(num)) return '0';
+                
+                // Format based on the value size
+                if (num >= 1000) {
+                  return (num / 1000).toFixed(1) + 'k';
+                } else if (num >= 100) {
+                  return num.toFixed(0);
+                } else if (num >= 10) {
+                  // For values 10-99, show integer if whole number, otherwise 1 decimal
+                  return num % 1 === 0 ? num.toFixed(0) : num.toFixed(1);
+                } else if (num >= 1) {
+                  // For values 1-10, show appropriate decimals
+                  if (num % 1 === 0) return num.toFixed(0);
+                  if ((num * 10) % 1 === 0) return num.toFixed(1);
+                  return num.toFixed(2);
+                } else if (num > 0) {
+                  // For values less than 1
+                  if (num >= 0.1) return num.toFixed(2);
+                  if (num >= 0.01) return num.toFixed(3);
+                  return num.toFixed(4);
+                } else {
+                  return '0';
+                }
+              }}
+              width={60}
             />
             <Tooltip 
               labelFormatter={(label) => `Date: ${label.toLocaleDateString('en-GB')}`} 
@@ -161,6 +279,22 @@ export const DischargeChart = ({ timeSeriesData, selectedSeries = 'both', statio
                 activeDot={{ r: 6, stroke: '#ff7f0e', strokeWidth: 2, fill: 'white' }}
               />
             }
+            {closestDataPoint && (
+              <ReferenceLine 
+                x={closestDataPoint.time} 
+                stroke="#666666" 
+                strokeWidth={1.5}
+                strokeDasharray="8 4"
+                label={{ 
+                  value: "Current Date", 
+                  position: "insideTop",
+                  offset: 15,
+                  fill: "#333333",
+                  fontSize: 11,
+                  fontWeight: 600
+                }}
+              />
+            )}
           </LineChart>
         </ResponsiveContainer>
     </div>
@@ -168,7 +302,7 @@ export const DischargeChart = ({ timeSeriesData, selectedSeries = 'both', statio
 };
 
 // Component to render GeoSFM charts (river depth or streamflow)
-export const GeoSFMChart = ({ timeSeriesData, dataType = 'riverdepth', stationName = '' }) => {
+export const GeoSFMChart = ({ timeSeriesData, dataType = 'riverdepth', stationName = '', height = 300 }) => {
   const chartRef = useRef(null);
   
   if (!timeSeriesData || timeSeriesData.length === 0) {
@@ -190,8 +324,8 @@ export const GeoSFMChart = ({ timeSeriesData, dataType = 'riverdepth', stationNa
 
   return (
     <div className="chart-container" ref={chartRef}>
-      <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={timeSeriesData} margin={{ top: 20, right: 30, left: 70, bottom: 80 }}>
+      <ResponsiveContainer width="100%" height={height}>
+          <LineChart data={timeSeriesData} margin={{ top: 10, right: 20, left: 50, bottom: 60 }}>
             <defs>
               <linearGradient id="geosfmGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#1f77b4" stopOpacity={0.3}/>
@@ -203,11 +337,14 @@ export const GeoSFMChart = ({ timeSeriesData, dataType = 'riverdepth', stationNa
               dataKey="timestamp" 
               angle={-45} 
               textAnchor="end" 
-              height={100} 
-              tickFormatter={(dt) => new Date(dt).toLocaleDateString('en-GB')} 
-              minTickGap={50}
+              height={60} 
+              tickFormatter={(dt) => {
+                const date = new Date(dt);
+                return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+              }} 
+              minTickGap={40}
               stroke="#666"
-              fontSize={12}
+              fontSize={10}
             />
             <YAxis 
               domain={yDomain}
@@ -215,13 +352,26 @@ export const GeoSFMChart = ({ timeSeriesData, dataType = 'riverdepth', stationNa
                 value: yAxisLabel, 
                 angle: -90, 
                 position: 'insideLeft', 
-                offset: -30, 
-                dy: 60, 
-                style: { fontSize: '12px', fontWeight: 'bold', fill: '#333' } 
+                offset: 15, 
+                style: { textAnchor: 'middle', fontSize: '13px', fill: '#333' } 
               }} 
-              tickFormatter={(value) => Number(value).toFixed(1)}
+              tickFormatter={(value) => {
+                const num = Number(value);
+                if (dataType === 'riverdepth') {
+                  return num.toFixed(2);
+                } else {
+                  if (num >= 1000) {
+                    return (num / 1000).toFixed(1) + 'k';
+                  } else if (num >= 100) {
+                    return num.toFixed(0);
+                  } else {
+                    return num.toFixed(1);
+                  }
+                }
+              }}
+              width={60}
               stroke="#666"
-              fontSize={12}
+              fontSize={11}
             />
             <Tooltip 
               labelFormatter={(label) => `Date: ${new Date(label).toLocaleDateString('en-GB')}`} 

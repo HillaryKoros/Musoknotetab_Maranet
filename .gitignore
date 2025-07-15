@@ -45,3 +45,4 @@ cogs/
 # PostGIS backup files
 *.sql.gz
 *.dump
+*.claude

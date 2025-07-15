@@ -252,17 +252,3 @@ class Admin1(models.Model):
     def __str__(self):
         return self.country  
 
-class WaterBodies(models.Model):
-    af_wtr_id = models.BigIntegerField()
-    sqkm = models.FloatField()
-    name_of_wa = models.CharField(max_length=254, blank=True, null=True)
-    type_of_wa = models.CharField(max_length=254, blank=True, null=True)
-    shape_area = models.FloatField()
-    shape_len = models.FloatField()
-    geom = models.MultiPolygonField(srid=4326)
-
-    def __unicode__(self):
-        return self.name_of_wa or "Unnamed Water Body"
-
-    class Meta:
-        verbose_name_plural = "WaterBodies"

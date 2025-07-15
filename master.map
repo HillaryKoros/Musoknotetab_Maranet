@@ -1,0 +1,1203 @@
+MAP
+  NAME "FloodWatch"
+  EXTENT -180 -90 180 90
+  UNITS DD
+  SIZE 800 600
+  IMAGECOLOR 255 255 255
+  IMAGETYPE PNG
+  CONFIG "MS_ERRORFILE" "/tmp/mapserver_error.log"
+  DEBUG 5
+  
+  # Updated SHAPEPATH to match actual Docker volume structure
+  SHAPEPATH "/etc/mapserver/data"
+  
+  # Web configuration for WMS services
+  WEB
+    METADATA
+      "wms_title" "Flood Watch System"
+      "wms_onlineresource" "http://197.254.1.10:8093/cgi-bin/mapserv?map=/etc/mapserver/master.map&"
+      "wms_srs" "EPSG:4326 EPSG:3857 EPSG:900913"
+      "wms_enable_request" "*"
+      "ows_enable_request" "*"
+      "wms_encoding" "UTF-8"
+      "ows_http_max_age" "3600"
+      "ows_enable_cors" "true"
+      "ows_cors_allowed_origin" "*"
+    END
+  END
+
+  # Global projection definition
+  PROJECTION
+    "init=epsg:4326"
+  END
+
+  #############################################
+  # ADMINISTRATIVE BOUNDARY LAYERS
+  #############################################
+  
+  # Admin Level 1 (Countries)
+  LAYER
+    NAME "admin_level_1"
+    STATUS ON
+    TYPE POLYGON
+    DATA "shapefiles/admin/admin_level_0"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Administrative Boundaries Level 0 (Countries)"
+      "wms_enable_request" "*"
+    END
+    
+    CLASS
+      NAME "Admin Level 1"
+      STYLE
+        OUTLINECOLOR 80 80 80
+        WIDTH 2
+        COLOR -1 -1 -1
+      END
+    END
+  END
+  
+  # Admin Level 2 
+  LAYER
+    NAME "admin_level_2"
+    STATUS ON
+    TYPE POLYGON
+    DATA "shapefiles/admin/admin_level_1"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Administrative Boundaries Level 1 (States/Provinces)"
+      "wms_enable_request" "*"
+    END
+    
+    CLASS
+      NAME "Admin Level 2"
+      STYLE
+        OUTLINECOLOR 160 160 160
+        WIDTH 1
+        COLOR -1 -1 -1
+      END
+    END
+  END
+  
+  #############################################
+  # HYDROLOGICAL LAYERS
+  #############################################
+  
+  # Rivers layer
+  LAYER
+    NAME "rivers"
+    STATUS ON
+    TYPE LINE
+    DATA "shapefiles/admin/rivers"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Rivers"
+      "wms_enable_request" "*"
+    END
+    
+    CLASS
+      NAME "Rivers"
+      STYLE
+        COLOR 0 128 255
+        WIDTH 1
+      END
+    END
+  END
+  
+  # Lakes layer
+  LAYER
+    NAME "lakes"
+    STATUS ON
+    TYPE POLYGON
+    DATA "shapefiles/admin/lakes"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Lakes"
+      "wms_enable_request" "*"
+    END
+    
+    CLASS
+      NAME "Lakes"
+      STYLE
+        COLOR 64 164 223
+        OUTLINECOLOR -1 -1 -1
+      END
+    END
+  END
+
+  #############################################
+  # IMPACT LAYERS - Updated paths
+  #############################################
+  
+  # Affected Population Layer
+  LAYER
+    NAME "impact_population"
+    STATUS ON
+    TYPE POLYGON
+    DATA "/etc/mapserver/data/shapefiles/impact_shapefiles/impact_population.shp"
+    TEMPLATE "query"
+    TEMPLATE "query"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Affected Population"
+      "wms_abstract" "Population affected by flooding"
+      "wms_enable_request" "*"
+    END
+    
+    CLASSITEM "flood_tot"
+    
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] <= 0.1)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Low Impact (0.1-2)"
+      EXPRESSION ([flood_tot] > 0.1 AND [flood_tot] <= 2)
+      STYLE
+        COLOR 255 255 204
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Medium Impact (2-5)"
+      EXPRESSION ([flood_tot] > 2 AND [flood_tot] <= 5)
+      STYLE
+        COLOR 255 204 153
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "High Impact (5-7)"
+      EXPRESSION ([flood_tot] > 5 AND [flood_tot] <= 7)
+      STYLE
+        COLOR 255 153 102
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Very High Impact (7+)"
+      EXPRESSION ([flood_tot] > 7)
+      STYLE
+        COLOR 255 0 0
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+  END
+
+  # Impacted GDP Layer
+  LAYER
+    NAME "impact_gdp"
+    STATUS ON
+    TYPE POLYGON
+    DATA "/etc/mapserver/data/shapefiles/impact_shapefiles/impact_gdp.shp"
+    TEMPLATE "query"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Impacted GDP"
+      "wms_abstract" "GDP impact from flooding"
+      "wms_enable_request" "*"
+    END
+    
+    CLASSITEM "flood_tot"
+    
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] <= 0.1)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Low Impact (0.1-2)"
+      EXPRESSION ([flood_tot] > 0.1 AND [flood_tot] <= 2)
+      STYLE
+        COLOR 255 255 204
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Medium Impact (2-5)"
+      EXPRESSION ([flood_tot] > 2 AND [flood_tot] <= 5)
+      STYLE
+        COLOR 255 204 153
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "High Impact (5-7)"
+      EXPRESSION ([flood_tot] > 5 AND [flood_tot] <= 7)
+      STYLE
+        COLOR 255 153 102
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Very High Impact (7+)"
+      EXPRESSION ([flood_tot] > 7)
+      STYLE
+        COLOR 255 0 0
+        OUTLINECOLOR 150 150 150
+        Width 0.5
+      END
+    END
+  END
+
+  # Affected Crops Layer
+  LAYER
+    NAME "impact_crops"
+    STATUS ON
+    TYPE POLYGON
+    DATA "/etc/mapserver/data/shapefiles/impact_shapefiles/impact_crops.shp"
+    TEMPLATE "query"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Affected Crops"
+      "wms_abstract" "Agricultural crops affected by flooding"
+      "wms_enable_request" "*"
+    END
+    
+    CLASSITEM "flood_tot"
+    
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] <= 0.1)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Low Impact (0.1-2)"
+      EXPRESSION ([flood_tot] > 0.1 AND [flood_tot] <= 2)
+      STYLE
+        COLOR 144 238 144
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Medium Impact (2-5)"
+      EXPRESSION ([flood_tot] > 2 AND [flood_tot] <= 5)
+      STYLE
+        COLOR 255 215 0
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "High Impact (5-7)"
+      EXPRESSION ([flood_tot] > 5 AND [flood_tot] <= 7)
+      STYLE
+        COLOR 255 140 0
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Very High Impact (7+)"
+      EXPRESSION ([flood_tot] > 7)
+      STYLE
+        COLOR 178 34 34
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+  END
+
+  # Affected Roads Layer
+  LAYER
+    NAME "impact_roads"
+    STATUS ON
+    TYPE POLYGON
+    DATA "/etc/mapserver/data/shapefiles/impact_shapefiles/impact_roads.shp"
+    TEMPLATE "query"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Affected Roads"
+      "wms_abstract" "Road infrastructure affected by flooding"
+      "wms_enable_request" "*"
+    END
+    
+    CLASSITEM "flood_tot"
+    
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] <= 0.1)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Low Impact (0.1-2)"
+      EXPRESSION ([flood_tot] > 0.1 AND [flood_tot] <= 2)
+      STYLE
+        COLOR 220 220 220
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Medium Impact (2-5)"
+      EXPRESSION ([flood_tot] > 2 AND [flood_tot] <= 5)
+      STYLE
+        COLOR 169 169 169
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "High Impact (5-7)"
+      EXPRESSION ([flood_tot] > 5 AND [flood_tot] <= 7)
+      STYLE
+        COLOR 105 105 105
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Very High Impact (7+)"
+      EXPRESSION ([flood_tot] > 7)
+      STYLE
+        COLOR 47 79 79
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+  END
+
+  # Displaced Population Layer
+  LAYER
+    NAME "impact_displaced"
+    STATUS ON
+    TYPE POLYGON
+    DATA "/etc/mapserver/data/shapefiles/impact_shapefiles/impact_displaced.shp"
+    TEMPLATE "query"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Displaced Population"
+      "wms_abstract" "Population displaced by flooding"
+      "wms_enable_request" "*"
+    END
+    
+    CLASSITEM "flood_tot"
+    
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] <= 0.1)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Low Impact (0.1-2)"
+      EXPRESSION ([flood_tot] > 0.1 AND [flood_tot] <= 2)
+      STYLE
+        COLOR 255 182 193
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Medium Impact (2-5)"
+      EXPRESSION ([flood_tot] > 2 AND [flood_tot] <= 5)
+      STYLE
+        COLOR 255 105 180
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "High Impact (5-7)"
+      EXPRESSION ([flood_tot] > 5 AND [flood_tot] <= 7)
+      STYLE
+        COLOR 255 20 147
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Very High Impact (7+)"
+      EXPRESSION ([flood_tot] > 7)
+      STYLE
+        COLOR 139 0 139
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+  END
+
+  # Affected Livestock Layer
+  LAYER
+    NAME "impact_livestock"
+    STATUS ON
+    TYPE POLYGON
+    DATA "/etc/mapserver/data/shapefiles/impact_shapefiles/impact_livestock.shp"
+    TEMPLATE "query"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Affected Livestock"
+      "wms_abstract" "Livestock affected by flooding"
+      "wms_enable_request" "*"
+    END
+    
+    CLASSITEM "flood_tot"
+    
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] <= 0.1)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Low Impact (0.1-2)"
+      EXPRESSION ([flood_tot] > 0.1 AND [flood_tot] <= 2)
+      STYLE
+        COLOR 222 184 135
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Medium Impact (2-5)"
+      EXPRESSION ([flood_tot] > 2 AND [flood_tot] <= 5)
+      STYLE
+        COLOR 205 133 63
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "High Impact (5-7)"
+      EXPRESSION ([flood_tot] > 5 AND [flood_tot] <= 7)
+      STYLE
+        COLOR 160 82 45
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Very High Impact (7+)"
+      EXPRESSION ([flood_tot] > 7)
+      STYLE
+        COLOR 101 67 33
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+  END
+
+  # Affected Grazing Land Layer
+  LAYER
+    NAME "impact_grazing"
+    STATUS ON
+    TYPE POLYGON
+    DATA "/etc/mapserver/data/shapefiles/impact_shapefiles/impact_grazing.shp"
+    TEMPLATE "query"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Affected Grazing Land"
+      "wms_abstract" "Grazing land affected by flooding"
+      "wms_enable_request" "*"
+    END
+    
+    CLASSITEM "flood_tot"
+    
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] <= 0.1)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Low Impact (0.1-2)"
+      EXPRESSION ([flood_tot] > 0.1 AND [flood_tot] <= 2)
+      STYLE
+        COLOR 154 205 50
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Medium Impact (2-5)"
+      EXPRESSION ([flood_tot] > 2 AND [flood_tot] <= 5)
+      STYLE
+        COLOR 124 252 0
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "High Impact (5-7)"
+      EXPRESSION ([flood_tot] > 5 AND [flood_tot] <= 7)
+      STYLE
+        COLOR 85 107 47
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+    
+    CLASS
+      NAME "Very High Impact (7+)"
+      EXPRESSION ([flood_tot] > 7)
+      STYLE
+        COLOR 107 142 35
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+      END
+    END
+  END
+  
+  #############################################
+  # RASTER LAYERS - BINARY FLOOD DATA
+  #############################################
+  
+  # Main Flood Hazard Layer - Generic name
+  # Optimized for binary data (0=no flood, 1=flood)
+  LAYER
+    NAME "flood_hazard"
+    STATUS ON
+    TYPE RASTER
+    DATA "rasters/flood_hazard_map_floodproofs_202505270000.tif"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Flood Hazard Map"
+      "wms_abstract" "Current flood extent based on latest FloodProofs simulation"
+      "wms_enable_request" "*"
+    END
+    
+    CLASSITEM "[pixel]"
+    
+    CLASS
+      NAME "No Flood"
+      EXPRESSION ([pixel] = 0)
+      STYLE
+        COLOR 255 255 255
+        OPACITY 0  # Transparent
+      END
+    END
+    
+    CLASS
+      NAME "Flood Area"
+      EXPRESSION ([pixel] = 1)
+      STYLE
+        COLOR 30 144 255  # Dodger Blue - good water color
+        OPACITY 70        # Semi-transparent
+      END
+    END
+  END
+  
+  # Date-specific Flood Hazard Layer - For frontend compatibility
+  # Same binary styling
+  LAYER
+    NAME "flood_hazard_20250527"
+    STATUS ON
+    TYPE RASTER
+    DATA "rasters/flood_hazard_map_floodproofs_202505270000.tif"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Flood Hazard Map (Today)"
+      "wms_abstract" "Current flood extent based on latest FloodProofs simulation"
+      "wms_enable_request" "*"
+    END
+    
+    CLASSITEM "[pixel]"
+    
+    CLASS
+      NAME "No Flood"
+      EXPRESSION ([pixel] = 0)
+      STYLE
+        COLOR 255 255 255
+        OPACITY 0  # Transparent
+      END
+    END
+    
+    CLASS
+      NAME "Flood Area"
+      EXPRESSION ([pixel] = 1)
+      STYLE
+        COLOR 30 144 255  # Dodger Blue - good water color
+        OPACITY 70        # Semi-transparent
+      END
+    END
+  END
+  
+  # Alerts Layer from HMC
+  LAYER
+    NAME "Alerts"
+    STATUS ON
+    TYPE RASTER
+    DATA "rasters/HMC/group1_mosaic_alert_level.tif"
+    PROJECTION
+      "init=epsg:4326"
+    END
+    
+    METADATA
+      "wms_title" "Flood Alerts Map"
+      "wms_abstract" "Current flood alerts based on latest HMC data"
+      "wms_enable_request" "*"
+    END
+    
+    CLASS
+      NAME "No Alert"
+      EXPRESSION ([pixel] <= 0)
+      STYLE
+        COLOR 255 255 255
+        OPACITY 0
+      END
+    END
+    
+    CLASS
+      NAME "Low Alert (Level 1)"
+      EXPRESSION ([pixel] = 1)
+      STYLE
+        COLOR 45 210 247
+      END
+    END
+    
+    CLASS
+      NAME "Medium Alert (Level 2)"
+      EXPRESSION ([pixel] = 2)
+      STYLE
+        COLOR 255 255 0
+      END
+    END
+    
+    CLASS
+      NAME "High Alert (Level 3+)"
+      EXPRESSION ([pixel] >= 3)
+      STYLE
+        COLOR 255 0 0
+      END
+    END
+  END
+
+  #############################################
+  # IBEW LAYERS - IMPACT BASED EARLY WARNING
+  # All layers use flood_tot attribute for classification
+  # 3-class system: No Impact, Moderate Impact, High Impact
+  #############################################
+  
+  # Health Centers Affected
+  LAYER
+    NAME "healthtot_%date%"
+    STATUS ON
+    TYPE POLYGON
+    DATA "shapefiles/ibew_shapefiles/%datetime%_FPimpacts-healthtot"
+    TEMPLATE "query"
+    PROJECTION
+      "init=epsg:4326"
+    END
+  
+  VALIDATION
+    "date" "^[0-9]{8}$"
+    "datetime" "^[0-9]{12}$"
+    "default_date" "20250618"
+    "default_datetime" "202506180000"
+  END
+    METADATA
+      "wms_title" "Health Centers Affected"
+      "wms_abstract" "Number of health centers affected by flooding"
+      "wms_enable_request" "*"
+    END
+    CLASSITEM "flood_tot"
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] = 0)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    CLASS
+      NAME "Moderate Impact (1-50)"
+      EXPRESSION ([flood_tot] > 0 AND [flood_tot] <= 50)
+      STYLE
+        COLOR 255 204 0
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    CLASS
+      NAME "High Impact (>50)"
+      EXPRESSION ([flood_tot] > 50)
+      STYLE
+        COLOR 255 0 0
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+  END
+
+  # People Affected by 100cm Flood Depth
+  LAYER
+    NAME "popaff100_%date%"
+    STATUS ON
+    TYPE POLYGON
+    DATA "shapefiles/ibew_shapefiles/%datetime%_FPimpacts-popaff100"
+    TEMPLATE "query"
+    PROJECTION
+      "init=epsg:4326"
+    END
+  
+  VALIDATION
+    "date" "^[0-9]{8}$"
+    "datetime" "^[0-9]{12}$"
+    "default_date" "20250618"
+    "default_datetime" "202506180000"
+  END
+    METADATA
+      "wms_title" "People Affected (100cm)"
+      "wms_abstract" "People affected by at least 100 cm of flood depth"
+      "wms_enable_request" "*"
+    END
+    CLASSITEM "flood_tot"
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] = 0)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    CLASS
+      NAME "Moderate Impact (1-500)"
+      EXPRESSION ([flood_tot] > 0 AND [flood_tot] <= 500)
+      STYLE
+        COLOR 255 178 102
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    CLASS
+      NAME "High Impact (>500)"
+      EXPRESSION ([flood_tot] > 500)
+      STYLE
+        COLOR 204 0 0
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+  END
+
+  # People Affected by 25cm Flood Depth
+  LAYER
+    NAME "popaff25_%date%"
+    STATUS ON
+    TYPE POLYGON
+    DATA "shapefiles/ibew_shapefiles/%datetime%_FPimpacts-popaff25"
+    TEMPLATE "query"
+    PROJECTION
+      "init=epsg:4326"
+    END
+  
+  VALIDATION
+    "date" "^[0-9]{8}$"
+    "datetime" "^[0-9]{12}$"
+    "default_date" "20250618"
+    "default_datetime" "202506180000"
+  END
+    METADATA
+      "wms_title" "People Affected (25cm)"
+      "wms_abstract" "People affected by at least 25 cm of flood depth"
+      "wms_enable_request" "*"
+    END
+    CLASSITEM "flood_tot"
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] = 0)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    CLASS
+      NAME "Moderate Impact (1-1000)"
+      EXPRESSION ([flood_tot] > 0 AND [flood_tot] <= 1000)
+      STYLE
+        COLOR 255 204 153
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    CLASS
+      NAME "High Impact (>1000)"
+      EXPRESSION ([flood_tot] > 1000)
+      STYLE
+        COLOR 255 102 0
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+  END
+
+  # Total People Affected
+  LAYER
+    NAME "popafftot_%date%"
+    STATUS ON
+    TYPE POLYGON
+    DATA "shapefiles/ibew_shapefiles/%datetime%_FPimpacts-popafftot"
+    TEMPLATE "query"
+    PROJECTION
+      "init=epsg:4326"
+    END
+  
+  VALIDATION
+    "date" "^[0-9]{8}$"
+    "datetime" "^[0-9]{12}$"
+    "default_date" "20250618"
+    "default_datetime" "202506180000"
+  END
+    METADATA
+      "wms_title" "Total People Affected"
+      "wms_abstract" "Total population affected by any level of flooding"
+      "wms_enable_request" "*"
+    END
+    CLASSITEM "flood_tot"
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] = 0)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    CLASS
+      NAME "Moderate Impact (1-2000)"
+      EXPRESSION ([flood_tot] > 0 AND [flood_tot] <= 2000)
+      STYLE
+        COLOR 255 204 0
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    CLASS
+      NAME "High Impact (>2000)"
+      EXPRESSION ([flood_tot] > 2000)
+      STYLE
+        COLOR 255 0 0
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+  END
+
+  # Vulnerable Age Groups (100cm)
+  LAYER
+    NAME "popage100_%date%"
+    STATUS ON
+    TYPE POLYGON
+    DATA "shapefiles/ibew_shapefiles/%datetime%_FPimpacts-popage100"
+    TEMPLATE "query"
+    PROJECTION
+      "init=epsg:4326"
+    END
+  
+  VALIDATION
+    "date" "^[0-9]{8}$"
+    "datetime" "^[0-9]{12}$"
+    "default_date" "20250618"
+    "default_datetime" "202506180000"
+  END
+    METADATA
+      "wms_title" "Vulnerable Age Groups (100cm)"
+      "wms_abstract" "Vulnerable age groups affected by 100cm+ flooding"
+      "wms_enable_request" "*"
+    END
+    CLASSITEM "flood_tot"
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] = 0)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    CLASS
+      NAME "Moderate Impact (1-200)"
+      EXPRESSION ([flood_tot] > 0 AND [flood_tot] <= 200)
+      STYLE
+        COLOR 251 180 185
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    CLASS
+      NAME "High Impact (>200)"
+      EXPRESSION ([flood_tot] > 200)
+      STYLE
+        COLOR 197 27 138
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+  END
+
+  # Vulnerable Age Groups (25cm)
+  LAYER
+    NAME "popage25_%date%"
+    STATUS ON
+    TYPE POLYGON
+    DATA "shapefiles/ibew_shapefiles/%datetime%_FPimpacts-popage25"
+    TEMPLATE "query"
+    PROJECTION
+      "init=epsg:4326"
+    END
+  
+  VALIDATION
+    "date" "^[0-9]{8}$"
+    "datetime" "^[0-9]{12}$"
+    "default_date" "20250618"
+    "default_datetime" "202506180000"
+  END
+    METADATA
+      "wms_title" "Vulnerable Age Groups (25cm)"
+      "wms_abstract" "Vulnerable age groups affected by 25cm+ flooding"
+      "wms_enable_request" "*"
+    END
+    CLASSITEM "flood_tot"
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] = 0)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    CLASS
+      NAME "Moderate Impact (1-500)"
+      EXPRESSION ([flood_tot] > 0 AND [flood_tot] <= 500)
+      STYLE
+        COLOR 215 181 216
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    CLASS
+      NAME "High Impact (>500)"
+      EXPRESSION ([flood_tot] > 500)
+      STYLE
+        COLOR 128 59 128
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+  END
+
+  # Reduced Mobility Population (100cm)
+  LAYER
+    NAME "popmob100_%date%"
+    STATUS ON
+    TYPE POLYGON
+    DATA "shapefiles/ibew_shapefiles/%datetime%_FPimpacts-popmob100"
+    TEMPLATE "query"
+    PROJECTION
+      "init=epsg:4326"
+    END
+  
+  VALIDATION
+    "date" "^[0-9]{8}$"
+    "datetime" "^[0-9]{12}$"
+    "default_date" "20250618"
+    "default_datetime" "202506180000"
+  END
+    METADATA
+      "wms_title" "Reduced Mobility (100cm)"
+      "wms_abstract" "People with reduced mobility affected by 100cm+ flooding"
+      "wms_enable_request" "*"
+    END
+    CLASSITEM "flood_tot"
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] = 0)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    CLASS
+      NAME "Moderate Impact (1-50)"
+      EXPRESSION ([flood_tot] > 0 AND [flood_tot] <= 50)
+      STYLE
+        COLOR 245 178 115
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    CLASS
+      NAME "High Impact (>50)"
+      EXPRESSION ([flood_tot] > 50)
+      STYLE
+        COLOR 166 54 3
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+  END
+
+  # Reduced Mobility Population (25cm)
+  LAYER
+    NAME "popmob25_%date%"
+    STATUS ON
+    TYPE POLYGON
+    DATA "shapefiles/ibew_shapefiles/%datetime%_FPimpacts-popmob25"
+    TEMPLATE "query"
+    PROJECTION
+      "init=epsg:4326"
+    END
+  
+  VALIDATION
+    "date" "^[0-9]{8}$"
+    "datetime" "^[0-9]{12}$"
+    "default_date" "20250618"
+    "default_datetime" "202506180000"
+  END
+    METADATA
+      "wms_title" "Reduced Mobility (25cm)"
+      "wms_abstract" "People with reduced mobility affected by 25cm+ flooding"
+      "wms_enable_request" "*"
+    END
+    CLASSITEM "flood_tot"
+    CLASS
+      NAME "No Impact"
+      EXPRESSION ([flood_tot] = 0)
+      STYLE
+        COLOR -1 -1 -1
+        OUTLINECOLOR 200 200 200
+        WIDTH 0.5
+      END
+    END
+    CLASS
+      NAME "Moderate Impact (1-100)"
+      EXPRESSION ([flood_tot] > 0 AND [flood_tot] <= 100)
+      STYLE
+        COLOR 253 208 162
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+    CLASS
+      NAME "High Impact (>100)"
+      EXPRESSION ([flood_tot] > 100)
+      STYLE
+        COLOR 230 85 13
+        OUTLINECOLOR 150 150 150
+        WIDTH 0.5
+        OPACITY 70
+      END
+    END
+  END
+
+END

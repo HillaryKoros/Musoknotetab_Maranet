@@ -58,7 +58,7 @@ const exportToPNG = (chartRef, filename, stationName = '') => {
 };
 
 // Component to render a discharge forecast chart
-export const DischargeChart = ({ timeSeriesData, selectedSeries = 'both', stationName = '', onSeriesChange, height = 300 }) => {
+export const DischargeChart = ({ timeSeriesData, selectedSeries = 'both', stationName = '', height = 300 }) => {
   const chartRef = useRef(null);
   console.log("DischargeChart received data:", timeSeriesData?.length, "points, series:", selectedSeries);
   
@@ -159,8 +159,9 @@ export const DischargeChart = ({ timeSeriesData, selectedSeries = 'both', statio
 
   const yTicks = calculateTicks(yDomain);
 
-  // Get current date for reference line - July 13, 2025
-  const currentDate = new Date(2025, 6, 13, 12, 0, 0); // Month is 0-indexed, so 6 = July, set to noon
+  // Get current date for reference line - make it dynamic
+  const today = new Date();
+  const currentDate = new Date(2025, today.getMonth(), today.getDate(), 12, 0, 0);
   
   // Find the closest data point to today for better alignment
   let closestDataPoint = null;
@@ -171,14 +172,71 @@ export const DischargeChart = ({ timeSeriesData, selectedSeries = 'both', statio
   }
   
   console.log("Processed chart data:", processedData.length, "points");
+  console.log("Sample data points:", processedData.slice(0, 3));
   console.log("Current date for reference line:", currentDate);
   console.log("Closest data point:", closestDataPoint);
+  
+  // Check if current date is within data range
+  if (processedData.length > 0) {
+    const firstDate = processedData[0].time;
+    const lastDate = processedData[processedData.length - 1].time;
+    console.log("Data range:", firstDate, "to", lastDate);
+    console.log("Current date in range?", currentDate >= firstDate && currentDate <= lastDate);
+  }
 
+
+  // Find today's data point in the dataset
+  const todayDataPoint = React.useMemo(() => {
+    if (processedData.length === 0) return null;
+    
+    // Check data range
+    const firstDate = processedData[0].time;
+    const lastDate = processedData[processedData.length - 1].time;
+    
+    console.log("Data range:", firstDate.toDateString(), "to", lastDate.toDateString());
+    console.log("Looking for today:", currentDate.toDateString());
+    
+    // Check if today is within the data range
+    if (currentDate < firstDate || currentDate > lastDate) {
+      console.log("Today is outside data range");
+      return null;
+    }
+    
+    // Find the closest data point to today
+    let closestPoint = null;
+    let closestDiff = Infinity;
+    let closestIndex = -1;
+    
+    for (let i = 0; i < processedData.length; i++) {
+      const dataPoint = processedData[i];
+      const diff = Math.abs(dataPoint.time.getTime() - currentDate.getTime());
+      
+      if (diff < closestDiff) {
+        closestDiff = diff;
+        closestPoint = dataPoint;
+        closestIndex = i;
+      }
+    }
+    
+    if (closestPoint) {
+      // Calculate position as percentage of data points
+      const percentage = (closestIndex / (processedData.length - 1)) * 100;
+      console.log("Found closest point:", closestPoint.time.toDateString(), "at index", closestIndex, "position:", percentage + "%");
+      
+      return {
+        dataPoint: closestPoint,
+        index: closestIndex,
+        positionPercent: percentage
+      };
+    }
+    
+    return null;
+  }, [processedData, currentDate]);
 
   return (
-    <div className="chart-container" ref={chartRef}>
+    <div className="chart-container" ref={chartRef} style={{ position: 'relative' }}>
       <ResponsiveContainer width="100%" height={height}>
-        <LineChart data={processedData} margin={{ top: 25, right: 20, left: 50, bottom: 60 }}>
+        <LineChart data={processedData} margin={{ top: 25, right: 20, left: 110, bottom: 60 }}>
             <defs>
               <linearGradient id="gfsGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#1f77b4" stopOpacity={0.3}/>
@@ -201,7 +259,7 @@ export const DischargeChart = ({ timeSeriesData, selectedSeries = 'both', statio
               }} 
               minTickGap={40}
               stroke="#666"
-              fontSize={10}
+              fontSize={11}
             />
             <YAxis 
               domain={yDomain}
@@ -219,29 +277,10 @@ export const DischargeChart = ({ timeSeriesData, selectedSeries = 'both', statio
                 const num = Number(value);
                 if (isNaN(num)) return '0';
                 
-                // Format based on the value size
-                if (num >= 1000) {
-                  return (num / 1000).toFixed(1) + 'k';
-                } else if (num >= 100) {
-                  return num.toFixed(0);
-                } else if (num >= 10) {
-                  // For values 10-99, show integer if whole number, otherwise 1 decimal
-                  return num % 1 === 0 ? num.toFixed(0) : num.toFixed(1);
-                } else if (num >= 1) {
-                  // For values 1-10, show appropriate decimals
-                  if (num % 1 === 0) return num.toFixed(0);
-                  if ((num * 10) % 1 === 0) return num.toFixed(1);
-                  return num.toFixed(2);
-                } else if (num > 0) {
-                  // For values less than 1
-                  if (num >= 0.1) return num.toFixed(2);
-                  if (num >= 0.01) return num.toFixed(3);
-                  return num.toFixed(4);
-                } else {
-                  return '0';
-                }
+                if (num >= 1000) return (num / 1000).toFixed(2) + 'k';
+                return num.toFixed(2);
               }}
-              width={60}
+              width={80}
             />
             <Tooltip 
               labelFormatter={(label) => `Date: ${label.toLocaleDateString('en-GB')}`} 
@@ -250,11 +289,15 @@ export const DischargeChart = ({ timeSeriesData, selectedSeries = 'both', statio
                 backgroundColor: 'rgba(255, 255, 255, 0.95)',
                 border: '1px solid #ccc',
                 borderRadius: '4px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                fontSize: '14px'
               }}
             />
             <RechartsLegend 
-              wrapperStyle={{ paddingTop: '10px' }}
+              wrapperStyle={{ 
+                paddingTop: '10px',
+                fontSize: '14px'
+              }}
               iconType="line"
             />
             {(selectedSeries === 'both' || selectedSeries === 'gfs') && 
@@ -279,18 +322,18 @@ export const DischargeChart = ({ timeSeriesData, selectedSeries = 'both', statio
                 activeDot={{ r: 6, stroke: '#ff7f0e', strokeWidth: 2, fill: 'white' }}
               />
             }
-            {closestDataPoint && (
+            {todayDataPoint && (
               <ReferenceLine 
-                x={closestDataPoint.time} 
-                stroke="#666666" 
-                strokeWidth={1.5}
-                strokeDasharray="8 4"
+                x={todayDataPoint.dataPoint.time} 
+                stroke="#FF4444" 
+                strokeWidth={2}
+                strokeDasharray="5 5"
                 label={{ 
-                  value: "Current Date", 
-                  position: "insideTop",
-                  offset: 15,
-                  fill: "#333333",
-                  fontSize: 11,
+                  value: "Today", 
+                  position: "insideTopRight",
+                  offset: 10,
+                  fill: "#FF4444",
+                  fontSize: 12,
                   fontWeight: 600
                 }}
               />
@@ -302,7 +345,7 @@ export const DischargeChart = ({ timeSeriesData, selectedSeries = 'both', statio
 };
 
 // Component to render GeoSFM charts (river depth or streamflow)
-export const GeoSFMChart = ({ timeSeriesData, dataType = 'riverdepth', stationName = '', height = 300 }) => {
+export const GeoSFMChart = ({ timeSeriesData, dataType = 'riverdepth', height = 300 }) => {
   const chartRef = useRef(null);
   
   if (!timeSeriesData || timeSeriesData.length === 0) {

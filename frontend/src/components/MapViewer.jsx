@@ -145,7 +145,7 @@ const IMPACT_LAYERS = [
 
 // IBEW Layers - UPDATED to use the exact layer names from GetCapabilities
 const IBEW_LAYERS = [
-  createWMSLayer("Health Centers Affected", "healthtot_%date%", true, false, true),
+  createWMSLayer("Health Facilities Affected", "healthtot_%date%", true, false, true),
   createWMSLayer("People Affected (100cm)", "popaff100_%date%", true, false, true),
   createWMSLayer("People Affected (25cm)", "popaff25_%date%", true, false, true),
   createWMSLayer("Total People Affected", "popafftot_%date%", true, false, true),
@@ -255,15 +255,32 @@ const LayerSelector = ({ title, layers, selectedLayers, onLayerSelect, onInfoCli
             <button
               onClick={() => setIsCalendarOpen(!isCalendarOpen)}
               style={{
-                padding: '4px 8px',
-                fontSize: '12px',
-                backgroundColor: '#f0f0f0',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
+                padding: '8px 12px',
+                fontSize: '14px',
+                backgroundColor: '#007bff',
+                border: '2px solid #007bff',
+                borderRadius: '6px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px'
+                gap: '6px',
+                color: 'white',
+                fontWeight: '500',
+                transition: 'all 0.2s ease',
+                minWidth: '140px',
+                justifyContent: 'center'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#0056b3';
+                e.target.style.borderColor = '#0056b3';
+                e.target.style.transform = 'translateY(-1px)';
+                e.target.style.boxShadow = '0 4px 12px rgba(0, 123, 255, 0.3)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#007bff';
+                e.target.style.borderColor = '#007bff';
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = 'none';
               }}
             >
               📅 {selectedDate || new Date().toISOString().split('T')[0]}
@@ -290,10 +307,27 @@ const LayerSelector = ({ title, layers, selectedLayers, onLayerSelect, onInfoCli
                   }}
                   max={new Date().toISOString().split('T')[0]}
                   style={{
-                    padding: '4px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    fontSize: '14px'
+                    padding: '8px 12px',
+                    border: '2px solid #007bff',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    backgroundColor: '#f8f9fa',
+                    color: '#495057',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    width: '100%'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#0056b3';
+                    e.target.style.backgroundColor = '#ffffff';
+                    e.target.style.boxShadow = '0 0 0 0.2rem rgba(0, 123, 255, 0.25)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#007bff';
+                    e.target.style.backgroundColor = '#f8f9fa';
+                    e.target.style.boxShadow = 'none';
                   }}
                 />
               </div>
@@ -450,7 +484,7 @@ const TabSidebar = ({
   showGlofas,
   setShowGlofas,
   onInfoClick,
-  selectedDates,
+  selectedDate,
   onDateChange,
 }) => {
   const [stationDate, setStationDate] = useState(new Date().toISOString().split('T')[0]);
@@ -670,8 +704,8 @@ const TabSidebar = ({
               selectedLayers={selectedLayers}
               onLayerSelect={onLayerSelect}
               onInfoClick={onInfoClick}
-              selectedDate={selectedDates?.inundation}
-              onDateChange={(date) => onDateChange('inundation', date)}
+              selectedDate={selectedDate}
+              onDateChange={onDateChange}
             />
             <LayerSelector
               title="Impact Layers"
@@ -679,8 +713,8 @@ const TabSidebar = ({
               selectedLayers={selectedLayers}
               onLayerSelect={onLayerSelect}
               onInfoClick={onInfoClick}
-              selectedDate={selectedDates?.impact}
-              onDateChange={(date) => onDateChange('impact', date)}
+              selectedDate={selectedDate}
+              onDateChange={onDateChange}
               showCalendar={true} // FIXED: Changed from false to true
             />
             <LayerSelector
@@ -689,8 +723,8 @@ const TabSidebar = ({
               selectedLayers={selectedLayers}
               onLayerSelect={onLayerSelect}
               onInfoClick={onInfoClick}
-              selectedDate={selectedDates?.ibew}
-              onDateChange={(date) => onDateChange('ibew', date)}
+              selectedDate={selectedDate}
+              onDateChange={onDateChange}
             />
           </Tab.Pane>
         </Tab.Content>
@@ -756,13 +790,11 @@ const StableWMSLayer = React.memo(({ url, layers, transparent = true, format = "
 // Main MapViewer component
 const MapViewer = () => {
   const [selectedLayers, setSelectedLayers] = useState(new Set());
-  const [isSidebarActive, setIsSidebarActive] = useState(true);
   const [selectedBoundaryLayers, setSelectedBoundaryLayers] = useState(new Set([
     'rivers',
     'admin_level_1'
   ]));
   const [activeLegend, setActiveLegend] = useState(null);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [mapKey, setMapKey] = useState(0);
   const [showMonitoringStations, setShowMonitoringStations] = useState(false);
   const [showGeoFSM, setShowGeoFSM] = useState(false);
@@ -798,26 +830,16 @@ const MapViewer = () => {
   const [showMetadataModal, setShowMetadataModal] = useState(false);
   const [currentMetadata, setCurrentMetadata] = useState(null);
   
-  // State for selected dates for different layer types
-  const [selectedDates, setSelectedDates] = useState({
-    stations: new Date().toISOString().split('T')[0],
-    inundation: new Date().toISOString().split('T')[0],
-    impact: new Date().toISOString().split('T')[0],
-    ibew: new Date().toISOString().split('T')[0],
-  });
+  // State for unified date selection for all layers
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // Handler for date changes
-  const handleDateChange = (layerType, date) => {
-    console.log(`Date changed for ${layerType}: ${date}`);
-    setSelectedDates(prev => ({
-      ...prev,
-      [layerType]: date
-    }));
+  // Handler for date changes - now applies to all layers
+  const handleDateChange = (date) => {
+    console.log(`Common date changed to: ${date}`);
+    setSelectedDate(date);
     
-    // Force map refresh for IBEW layers when date changes
-    if (layerType === 'ibew') {
-      setMapKey(prev => prev + 1);
-    }
+    // Force map refresh when date changes
+    setMapKey(prev => prev + 1);
   };
 
   // Handler for info icon clicks
@@ -994,7 +1016,7 @@ const MapViewer = () => {
         break;
       case 'left':
         newWidth = rect.right - e.clientX;
-        newX = e.clientX - (isSidebarActive ? 350 : 0);
+        newX = e.clientX - 350;
         break;
       case 'right':
         newWidth = e.clientX - rect.left;
@@ -1003,7 +1025,7 @@ const MapViewer = () => {
         newHeight = rect.bottom - e.clientY;
         newWidth = rect.right - e.clientX;
         newY = e.clientY - 80;
-        newX = e.clientX - (isSidebarActive ? 350 : 0);
+        newX = e.clientX - 350;
         break;
       case 'top-right':
         newHeight = rect.bottom - e.clientY;
@@ -1013,7 +1035,7 @@ const MapViewer = () => {
       case 'bottom-left':
         newHeight = e.clientY - rect.top;
         newWidth = rect.right - e.clientX;
-        newX = e.clientX - (isSidebarActive ? 350 : 0);
+        newX = e.clientX - 350;
         break;
       case 'bottom-right':
         newHeight = e.clientY - rect.top;
@@ -1034,7 +1056,7 @@ const MapViewer = () => {
         setPanelPosition(prev => ({ ...prev, y: newY }));
       }
     }
-  }, [isResizing, resizeDirection, panelWidth, panelHeight, panelPosition, isSidebarActive]);
+  }, [isResizing, resizeDirection, panelWidth, panelHeight, panelPosition]);
 
   const handleMouseUp = useCallback(() => {
     setIsResizing(false);
@@ -1057,13 +1079,13 @@ const MapViewer = () => {
     
     const windowWidth = window.innerWidth;
     const windowHeight = window.innerHeight;
-    const sidebarWidth = isSidebarActive ? (isMobile ? 0 : 350) : 0;
+    const sidebarWidth = 350;
     
     const newX = Math.max(sidebarWidth, Math.min(windowWidth - 400, e.clientX - dragOffset.x));
     const newY = Math.max(80, Math.min(windowHeight - panelHeight - 30, e.clientY - dragOffset.y));
     
     setPanelPosition({ x: newX - sidebarWidth, y: newY });
-  }, [isDragging, dragOffset, panelHeight, isSidebarActive, isMobile]);
+  }, [isDragging, dragOffset, panelHeight]);
 
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
@@ -1139,15 +1161,6 @@ const MapViewer = () => {
     [activeLegend],
   );
 
-  // Handle window resize for mobile responsiveness
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
   
   const handleBoundaryLayerSelection = useCallback(
     (layer) => {
@@ -1311,7 +1324,6 @@ const MapViewer = () => {
     [geoFSMData],
   );
 
-  const toggleSidebar = () => setIsSidebarActive(!isSidebarActive);
   
   // Update hazard layers
   const hazardLayersWithDate = React.useMemo(() => [
@@ -1323,29 +1335,13 @@ const MapViewer = () => {
   const getDateForLayerType = (layerConfig) => {
     if (!layerConfig.needsDate) return null;
     
-    // Determine which date to use based on layer
-    if (IMPACT_LAYERS.some(l => l.layer === layerConfig.layer)) {
-      return selectedDates.impact;
-    } else if (IBEW_LAYERS.some(l => l.layer === layerConfig.layer)) {
-      return selectedDates.ibew;
-    } else if (layerConfig.layer.includes('flood_hazard')) {
-      return selectedDates.inundation;
-    }
-    return null;
+    // Return the unified date for all layers
+    return selectedDate;
   };
 
   return (
-    <div className={`map-viewer ${isMobile ? 'mobile-view' : ''}`}>
-      {isMobile && (
-        <button 
-          className="toggle-sidebar-btn mobile-toggle" 
-          onClick={toggleSidebar}
-          aria-label={isSidebarActive ? "Close layers" : "Open layers"}
-        >
-          {isSidebarActive ? "×" : "☰"}
-        </button>
-      )}
-      <div className={`sidebar ${isSidebarActive ? "active" : ""} ${isMobile ? 'mobile-sidebar' : ''}`}>
+    <div className="map-viewer">
+      <div className="sidebar">
         <TabSidebar
           hazardLayers={hazardLayersWithDate}
           impactLayers={IMPACT_LAYERS}
@@ -1370,11 +1366,11 @@ const MapViewer = () => {
           showGlofas={showGlofas}
           setShowGlofas={setShowGlofas}
           onInfoClick={handleInfoClick}
-          selectedDates={selectedDates}
+          selectedDate={selectedDate}
           onDateChange={handleDateChange}
         />
       </div>
-      <div className={`main-content ${isMobile ? 'mobile-content' : ''}`}>
+      <div className="main-content">
         <div className="map-container" style={{
           bottom: (showChart && !panelPosition.x && !panelPosition.y) ? `${panelHeight + 30}px` : '30px'
         }}>
@@ -1434,7 +1430,7 @@ const MapViewer = () => {
                   transparent={true}
                   format="image/png"
                   version="1.1.0"
-                  zIndex={200}
+                  zIndex={layerId === 'rivers' ? 50 : 200}
                   layerConfig={{ needsDate: false }}
                 />
               )
@@ -1486,7 +1482,7 @@ const MapViewer = () => {
                     eventHandlers={{
                       add: () => setSelectedBoundaryLayers(prev => new Set([...prev, layer.layer])),
                       remove: () => {
-                        if (layer.layer !== 'admin_level_1') {
+                        if (layer.layer !== 'admin_level_1' && layer.layer !== 'rivers') {
                           setSelectedBoundaryLayers(prev => {
                             const newLayers = new Set(prev);
                             newLayers.delete(layer.layer);
@@ -1551,12 +1547,13 @@ const MapViewer = () => {
             {/* IBEW Popup Handler - replaces old FeatureInfoHandler */}
             <IBEWPopupHandler
               selectedLayers={selectedLayers}
-              selectedDate={selectedDates?.ibew}
+              selectedDate={selectedDate}
               mapConfig={MAP_CONFIG}
             />
             
           </MapContainer>
-          {activeLegend && (
+          {/* Temporarily disabled legend until repaired */}
+          {/* {activeLegend && (
             <div className="map-legend" style={{ 
               position: 'absolute', 
               bottom: '20px', 
@@ -1577,14 +1574,14 @@ const MapViewer = () => {
                 }
               />
             </div>
-          )}
+          )} */}
         </div>
         {showChart && (
-          <div className={`bottom-panel ${isMobile && isSidebarActive ? 'with-sidebar' : ''}`} style={{
+          <div className="bottom-panel" style={{
             position: 'fixed',
             bottom: panelPosition.y ? 'auto' : '30px',
             top: panelPosition.y ? `${panelPosition.y}px` : 'auto',
-            left: `${(isSidebarActive ? (isMobile ? 0 : 350) : 0) + panelPosition.x}px`,
+            left: `${350 + panelPosition.x}px`,
             right: (panelPosition.x || panelPosition.y) ? 'auto' : '0px',
             width: (panelPosition.x || panelPosition.y) ? `${panelWidth}px` : 'auto',
             height: `${panelHeight}px`,

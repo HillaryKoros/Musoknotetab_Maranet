@@ -30,3 +30,18 @@ mapserver/shapefiles/
 mapserver/timeseries_data/
 data/
 frontend/public/
+
+# TiPG/TiTiler migration documentation and configuration files
+migration_requirements_tipg_titiler.json
+architecture_tipg_titiler.md
+docker-compose-tipg-titiler.yml
+backend_integration_workflow.md
+one_day_migration_plan.json
+
+# COG files
+*.cog.tif
+cogs/
+
+# PostGIS backup files
+*.sql.gz
+*.dump

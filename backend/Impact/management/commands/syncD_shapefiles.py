@@ -20,8 +20,8 @@ class Command(BaseCommand):
     help = 'Sync remote impact layer shapefiles from SFTP and upload to database and MapServer'
     
     TEMP_DIR = './temp_shapefiles'
-    # Updated MapServer directory to match Docker mounted path
-    MAPSERVER_DIR = '/etc/mapserver/data/impact_shapefiles'
+    # Updated MapServer directory to use local data directory
+    MAPSERVER_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../../data/impact_shapefiles'))
     
     model_configurations = {
         AffectedPopulation: f'{current_date}0000_FPimpacts-Population.shp',

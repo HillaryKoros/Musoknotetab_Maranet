@@ -3,7 +3,7 @@ import { useMap, useMapEvents, Popup } from 'react-leaflet';
 
 // Configuration for available IBEW layers - maps dynamic to static names
 const IBEW_LAYER_CONFIG = [
-  { layer: "healthtot_%date%", name: "Health Centers Affected", staticPrefix: "healthtot" },
+  { layer: "healthtot_%date%", name: "Health Facilities Affected", staticPrefix: "healthtot" },
   { layer: "popaff100_%date%", name: "People Affected (100cm)", staticPrefix: "popaff100" },
   { layer: "popaff25_%date%", name: "People Affected (25cm)", staticPrefix: "popaff25" },
   { layer: "popafftot_%date%", name: "Total People Affected", staticPrefix: "popafftot" },
@@ -315,7 +315,11 @@ const IBEWPopup = ({ popupData, onClose }) => {
               // Calculate visible properties count dynamically
               const visibleProperties = Object.entries(feature.properties)
                 .filter(([key]) => {
-                  // Only hide administrative fields, show all data fields
+                  // For popafftot layer, show all properties in "View all properties"
+                  if (result.staticLayerName && result.staticLayerName.includes('popafftot')) {
+                    return true; // Show all properties for popafftot
+                  }
+                  // For other layers, only hide administrative fields, show all data fields
                   return !['NAME_0', 'NAME_1', 'CODE_ADM', 'GID_0', 'ENGTYPE_1', 'COD'].includes(key);
                 });
               
@@ -359,16 +363,26 @@ const IBEWPopup = ({ popupData, onClose }) => {
                         const props = feature.properties;
                         const entries = Object.entries(props);
                         
-                        // Find the most important numeric properties (excluding administrative fields)
-                        const importantProps = entries.filter(([key, value]) => {
-                          const numValue = parseFloat(value);
-                          return !isNaN(numValue) && 
-                                 !['LACK_CC', 'GID_0'].includes(key) &&
-                                 !key.startsWith('NAME_') &&
-                                 !key.startsWith('CODE_') &&
-                                 !key.startsWith('ENGTYPE_') &&
-                                 !key.startsWith('COD');
-                        }).slice(0, 4); // Show top 4 important metrics
+                        // Special handling for Total People Affected layer - only show pop_tot and flood_tot
+                        let importantProps;
+                        if (result.staticLayerName && result.staticLayerName.includes('popafftot')) {
+                          // For Total People Affected, only show pop_tot and flood_tot attributes
+                          importantProps = entries.filter(([key, value]) => {
+                            const numValue = parseFloat(value);
+                            return !isNaN(numValue) && (key === 'pop_tot' || key === 'flood_tot');
+                          });
+                        } else {
+                          // For other layers, find the most important numeric properties (excluding administrative fields)
+                          importantProps = entries.filter(([key, value]) => {
+                            const numValue = parseFloat(value);
+                            return !isNaN(numValue) && 
+                                   !['LACK_CC', 'GID_0'].includes(key) &&
+                                   !key.startsWith('NAME_') &&
+                                   !key.startsWith('CODE_') &&
+                                   !key.startsWith('ENGTYPE_') &&
+                                   !key.startsWith('COD');
+                          }).slice(0, 4); // Show top 4 important metrics
+                        }
                         
                         if (importantProps.length === 0) return null;
                         
@@ -411,8 +425,13 @@ const IBEWPopup = ({ popupData, onClose }) => {
                         );
                       })()}
                       
-                      {/* Flood Percentage and Classification - Only show if they exist */}
+                      {/* Flood Percentage and Classification - Only show if they exist and not for popafftot */}
                       {(() => {
+                        // Skip flood percentage and class for Total People Affected layer
+                        if (result.staticLayerName && result.staticLayerName.includes('popafftot')) {
+                          return null;
+                        }
+                        
                         const props = feature.properties;
                         const additionalMetrics = [];
                         
